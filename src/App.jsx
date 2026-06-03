@@ -1,892 +1,930 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  CheckCircle2,
-  ClipboardCheck,
-  Download,
-  FileText,
-  ListChecks,
-  Loader2,
-  Play,
-  RefreshCw,
-  Send,
-  Sparkles
-} from 'lucide-react';
+import { AlertCircle, FlaskConical, Save } from 'lucide-react';
+import CompletedIdeaSummary from './components/CompletedIdeaSummary.jsx';
+import IdeaIntakeScreen from './components/IdeaIntakeScreen.jsx';
+import IdeaPreviewPanel from './components/IdeaPreviewPanel.jsx';
+import ProposalBlueprintPanel from './components/ProposalBlueprintPanel.jsx';
+import RelatedWorkPlanPanel from './components/RelatedWorkPlanPanel.jsx';
+import WorkflowProgressRail from './components/WorkflowProgressRail.jsx';
 
-const DEFAULT_REQUIREMENTS = `Proposal must include:
-- Project title
-- Abstract
-- Motivation and gap
-- Project goal
-- Method or agent workflow
-- Figure or diagram with caption
-- Expected results
-- Research milestones with timeline estimates
-- Evaluation plan
-- Risks and mitigation
-- Resources or budget
-- References, assumptions, or source notes`;
+const MEMORY_KEY = 'ai-proposal-studio-stage1-memory-v2';
 
-const EMPTY_PROJECT = {
-  title: '',
+const WORKFLOW_STEPS = [
+  {
+    id: 'idea-intake',
+    title: 'Idea Intake',
+    description: 'Collect the rough research idea in a structured format.'
+  },
+  {
+    id: 'proposal-blueprint',
+    title: 'Proposal Blueprint',
+    description: 'Turn the intake into a structured scaffold for a stronger proposal.'
+  },
+  {
+    id: 'related-work',
+    title: 'Related Work',
+    description: 'Use keywords, papers, and domain cues to anchor the proposal in prior work.'
+  },
+  {
+    id: 'research-questions',
+    title: 'Research Questions',
+    description: 'Refine questions or hypotheses into a clearer research agenda.'
+  },
+  {
+    id: 'method-plan',
+    title: 'Method Plan',
+    description: 'Convert the blueprint into a stronger method and technical approach.'
+  },
+  {
+    id: 'evaluation-plan',
+    title: 'Evaluation Plan',
+    description: 'Define metrics, baselines, evidence, and success criteria.'
+  },
+  {
+    id: 'broader-impacts',
+    title: 'Broader Impacts',
+    description: 'Capture significance, beneficiaries, and broader research value.'
+  },
+  {
+    id: 'critique-revision',
+    title: 'Critique & Revision',
+    description: 'Run critic agents or review passes to improve weak sections.'
+  },
+  {
+    id: 'version-history',
+    title: 'Version History',
+    description: 'Save proposal snapshots and accepted revisions over time.'
+  }
+];
+
+const EMPTY_IDEA_INPUT = {
   topic: '',
+  domain: '',
   problem: '',
-  method: '',
-  timeline: '',
-  evaluation: '',
-  resources: '',
-  references: '',
-  requirements: DEFAULT_REQUIREMENTS
+  motivation: '',
+  beneficiaries: '',
+  keywords: '',
+  methods: '',
+  datasets: '',
+  expectedContribution: '',
+  uncertainties: ''
 };
 
-const PROJECT_FIELDS = [
-  ['problem', 'Problem'],
-  ['method', 'Method'],
-  ['evaluation', 'Evaluation'],
-  ['timeline', 'Timeline'],
-  ['resources', 'Resources'],
-  ['references', 'Sources']
-];
-
-const STAGES = [
-  ['1', 'Extract', 'LLM turns the rough idea into structured proposal data'],
-  ['2', 'Decide', 'You choose or edit candidate framings'],
-  ['3', 'Assemble', 'Accepted fields become project state'],
-  ['4', 'Draft', 'LLM writes proposal artifacts'],
-  ['5', 'Review', 'Matrix and critique check weak spots']
-];
-
-const TABS = [
-  ['pdf', FileText, 'PDF'],
-  ['latex', FileText, 'LaTeX'],
-  ['matrix', ClipboardCheck, 'Matrix'],
-  ['evaluation', ListChecks, 'Review']
-];
-
-const MEMORY_KEY = 'proposal-agent-final-project-memory-v1';
+const SAMPLE_IDEA_INPUT = {
+  topic: 'Citation-grounded proposal assistant for graduate students',
+  domain: 'Human-AI interaction, NLP, and educational tools',
+  problem:
+    'Graduate students often start with vague research directions and struggle to turn them into structured, graduate-style proposal drafts with clear scope.',
+  motivation:
+    'Weak early framing leads to unclear methods, missing evaluation plans, and proposals that read like brainstorms instead of credible research arguments.',
+  beneficiaries:
+    'Graduate students writing proposals, advisors giving early feedback, and instructors evaluating research planning quality.',
+  keywords:
+    'proposal writing, citation grounding, literature review agents, human-AI collaboration, research planning',
+  methods:
+    'A staged proposal workflow that collects structured idea intake, surfaces missing information, and later passes the result to blueprint and critic agents.',
+  datasets:
+    'MIT Communication Lab proposal advice, annotated proposal examples, proposal rubrics, and curated course examples.',
+  expectedContribution:
+    'A proposal studio workflow that turns rough ideas into a clearer proposal blueprint with explicit gaps, stronger motivation, and revision targets.',
+  uncertainties:
+    'Need to define the primary student population, choose a baseline against a plain chatbot, and decide how proposal quality improvement will be measured.'
+};
 
 function App() {
-  const [topicInput, setTopicInput] = useState('');
-  const [project, setProject] = useState(EMPTY_PROJECT);
-  const [fieldSuggestions, setFieldSuggestions] = useState([]);
-  const [decisions, setDecisions] = useState([]);
-  const [questions, setQuestions] = useState([]);
-  const [customNote, setCustomNote] = useState('');
-  const [result, setResult] = useState(null);
-  const [pdfUrl, setPdfUrl] = useState('');
-  const [runLog, setRunLog] = useState([]);
-  const [status, setStatus] = useState('idle');
+  const [activeStep, setActiveStep] = useState('idea-intake');
+  const [isEditingIdea, setIsEditingIdea] = useState(true);
+  const [ideaInput, setIdeaInput] = useState(EMPTY_IDEA_INPUT);
+  const [ideaPreview, setIdeaPreview] = useState(null);
+  const [analysisMode, setAnalysisMode] = useState(null);
+  const [lastAnalyzedAt, setLastAnalyzedAt] = useState('');
+  const [errors, setErrors] = useState({});
+  const [intakeStatus, setIntakeStatus] = useState('idle');
+  const [proposalBlueprint, setProposalBlueprint] = useState(null);
+  const [blueprintMode, setBlueprintMode] = useState(null);
+  const [blueprintStatus, setBlueprintStatus] = useState('idle');
+  const [blueprintError, setBlueprintError] = useState('');
+  const [blueprintGeneratedAt, setBlueprintGeneratedAt] = useState('');
+  const [blueprintStale, setBlueprintStale] = useState(false);
+  const [relatedWorkPlan, setRelatedWorkPlan] = useState(null);
+  const [relatedWorkMode, setRelatedWorkMode] = useState(null);
+  const [relatedWorkStatus, setRelatedWorkStatus] = useState('idle');
+  const [relatedWorkError, setRelatedWorkError] = useState('');
+  const [relatedWorkGeneratedAt, setRelatedWorkGeneratedAt] = useState('');
+  const [relatedWorkStale, setRelatedWorkStale] = useState(false);
+  const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('pdf');
-  const [suggestionIndex, setSuggestionIndex] = useState(0);
-  const [decisionIndex, setDecisionIndex] = useState(0);
-  const [memorySavedAt, setMemorySavedAt] = useState('');
   const [memoryReady, setMemoryReady] = useState(false);
 
-  const matrixStats = useMemo(() => {
-    const rows = result?.complianceMatrix || [];
-    const covered = rows.filter((row) => /^covered$/i.test(row.status)).length;
-    return { covered, total: rows.length };
-  }, [result]);
+  const completedFieldCount = useMemo(
+    () => Object.values(ideaInput).filter((value) => Boolean(clean(value))).length,
+    [ideaInput]
+  );
 
-  const acceptedCount = PROJECT_FIELDS.filter(([field]) => Boolean(project[field])).length;
-  const acceptedSuggestionCount = fieldSuggestions.filter((suggestion) => project[suggestion.field] === suggestion.value).length;
-  const currentSuggestion = fieldSuggestions[suggestionIndex] || null;
-  const currentDecision = decisions[decisionIndex] || null;
-  const currentQuestion = questions[0];
+  const completedSteps = useMemo(() => {
+    const steps = new Set();
+
+    if (ideaPreview) {
+      steps.add('idea-intake');
+    }
+
+    if (proposalBlueprint && !blueprintStale) {
+      steps.add('proposal-blueprint');
+    }
+
+    if (relatedWorkPlan && !relatedWorkStale) {
+      steps.add('related-work');
+    }
+
+    return steps;
+  }, [blueprintStale, ideaPreview, proposalBlueprint, relatedWorkPlan, relatedWorkStale]);
+
+  const currentStepNumber = useMemo(() => {
+    const index = WORKFLOW_STEPS.findIndex((step) => step.id === activeStep);
+    return index >= 0 ? index + 1 : 1;
+  }, [activeStep]);
 
   useEffect(() => {
-    loadSavedMemory({ silent: true });
-    setMemoryReady(true);
+    try {
+      const raw = localStorage.getItem(MEMORY_KEY);
+
+      if (!raw) {
+        setMemoryReady(true);
+        return;
+      }
+
+      const snapshot = JSON.parse(raw);
+      setActiveStep(snapshot.activeStep || 'idea-intake');
+      setIsEditingIdea(Boolean(snapshot.isEditingIdea));
+      setIdeaInput({ ...EMPTY_IDEA_INPUT, ...(snapshot.ideaInput || {}) });
+      setIdeaPreview(snapshot.ideaPreview || null);
+      setAnalysisMode(snapshot.analysisMode || null);
+      setLastAnalyzedAt(snapshot.lastAnalyzedAt || '');
+      setProposalBlueprint(snapshot.proposalBlueprint || null);
+      setBlueprintMode(snapshot.blueprintMode || null);
+      setBlueprintGeneratedAt(snapshot.blueprintGeneratedAt || '');
+      setBlueprintStale(Boolean(snapshot.blueprintStale));
+      setRelatedWorkPlan(snapshot.relatedWorkPlan || null);
+      setRelatedWorkMode(snapshot.relatedWorkMode || null);
+      setRelatedWorkGeneratedAt(snapshot.relatedWorkGeneratedAt || '');
+      setRelatedWorkStale(Boolean(snapshot.relatedWorkStale));
+      setNotice(snapshot.notice || '');
+      setError('');
+    } catch {
+      setError('Saved workspace data could not be loaded. Resetting to a clean workspace.');
+      localStorage.removeItem(MEMORY_KEY);
+    } finally {
+      setMemoryReady(true);
+    }
   }, []);
-
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
-    };
-  }, [pdfUrl]);
 
   useEffect(() => {
     if (!memoryReady) return;
 
-    if (!topicInput && !fieldSuggestions.length && !decisions.length && !result) {
+    if (!hasWorkspaceContent(ideaInput, ideaPreview, proposalBlueprint, relatedWorkPlan)) {
+      localStorage.removeItem(MEMORY_KEY);
       return;
     }
 
-    saveMemory({ silent: true });
-  }, [
-    memoryReady,
-    topicInput,
-    project,
-    fieldSuggestions,
-    decisions,
-    questions,
-    result,
-    runLog,
-    activeTab,
-    suggestionIndex,
-    decisionIndex
-  ]);
-
-  async function startAgent() {
-    return startAgentForTopic(topicInput);
-  }
-
-  async function startSampleAgent() {
-    const sampleTopic = 'Citation-grounded agent for literature review workflows';
-    setTopicInput(sampleTopic);
-    return startAgentForTopic(sampleTopic);
-  }
-
-  async function startAgentForTopic(nextTopic) {
-    setStatus('starting');
-    setError('');
-    clearArtifacts();
-
-    try {
-      const data = await postJson('/api/agent/start', {
-        topic: nextTopic,
-        requirements: DEFAULT_REQUIREMENTS
-      });
-
-      setProject({ ...EMPTY_PROJECT, ...data.project });
-      setFieldSuggestions(data.fieldSuggestions || []);
-      setDecisions(data.decisions || []);
-      setQuestions(data.questions || []);
-      setSuggestionIndex(0);
-      setDecisionIndex(0);
-      setRunLog([
-        logEntry('Extract', data.runMessage || 'LLM prepared structured suggestions.'),
-        logEntry('Decide', `Review ${(data.fieldSuggestions || []).length} fields and ${(data.decisions || []).length} decision card(s).`)
-      ]);
-      setCustomNote('');
-    } catch (requestError) {
-      setError(readError(requestError));
-    } finally {
-      setStatus('idle');
-    }
-  }
-
-  async function submitCustomNote() {
-    const trimmed = customNote.trim();
-    if (!trimmed) return;
-
-    setStatus('answering');
-    setError('');
-
-    try {
-      const data = await postJson('/api/agent/answer', {
-        project,
-        question: currentQuestion || {
-          field: 'method',
-          question: 'Integrate this user note into the project state.',
-          reason: 'The user provided a custom refinement.',
-          priority: 'Medium'
-        },
-        answer: trimmed,
-        requirements: DEFAULT_REQUIREMENTS
-      });
-
-      setProject({ ...EMPTY_PROJECT, ...data.project });
-      setFieldSuggestions(data.fieldSuggestions || []);
-      setDecisions(data.decisions || []);
-      setQuestions(data.questions || []);
-      setSuggestionIndex(0);
-      setDecisionIndex(0);
-      setRunLog((current) => [
-        ...current,
-        logEntry('Update', data.runMessage || 'Integrated custom note.'),
-        logEntry('Decide', `Refreshed ${(data.fieldSuggestions || []).length} suggested field(s).`)
-      ]);
-      setCustomNote('');
-      clearArtifacts();
-    } catch (requestError) {
-      setError(readError(requestError));
-    } finally {
-      setStatus('idle');
-    }
-  }
-
-  async function generateProposal() {
-    setStatus('drafting');
-    setError('');
-
-    try {
-      const data = await postJson('/api/proposal', {
-        ...project,
-        topic: project.topic || project.title,
-        requirements: DEFAULT_REQUIREMENTS
-      });
-      const nextPdfUrl = await exportPdfUrl(data.proposalLatex, project.title || 'proposal');
-
-      setResult(data);
-      updatePdfUrl(nextPdfUrl);
-      setActiveTab('pdf');
-      setRunLog((current) => [
-        ...current,
-        logEntry('Draft', `Generated proposal using ${data.mode}.`),
-        logEntry('Review', `Coverage ${countCovered(data.complianceMatrix)}/${data.complianceMatrix?.length || 0}.`)
-      ]);
-    } catch (requestError) {
-      setError(readError(requestError));
-    } finally {
-      setStatus('idle');
-    }
-  }
-
-  function acceptSuggestion(suggestion) {
-    updateProjectField(suggestion.field, suggestion.value);
-    advanceSuggestion();
-    setRunLog((current) => [...current, logEntry('Accept', `Accepted ${suggestion.label || suggestion.field}.`)]);
-  }
-
-  function skipSuggestion() {
-    if (!currentSuggestion) return;
-    advanceSuggestion();
-    setRunLog((current) => [...current, logEntry('Skip', `Skipped ${currentSuggestion.label || currentSuggestion.field}.`)]);
-  }
-
-  function advanceSuggestion() {
-    setSuggestionIndex((current) => Math.min(current + 1, Math.max(fieldSuggestions.length - 1, 0)));
-  }
-
-  function chooseOption(decision, option) {
-    updateProjectField(decision.field, option.value);
-    setDecisions((current) => {
-      const next = current.filter((item) => item.id !== decision.id);
-      setDecisionIndex((index) => Math.min(index, Math.max(next.length - 1, 0)));
-      return next;
-    });
-    setRunLog((current) => [...current, logEntry('Decision', `Selected ${option.label} for ${decision.title}.`)]);
-  }
-
-  function skipDecision() {
-    if (!currentDecision) return;
-    advanceDecision();
-    setRunLog((current) => [...current, logEntry('Skip', `Skipped ${currentDecision.title}.`)]);
-  }
-
-  function advanceDecision() {
-    setDecisionIndex((current) => Math.min(current + 1, Math.max(decisions.length - 1, 0)));
-  }
-
-  function updateProjectField(field, value) {
-    setProject((current) => ({
-      ...current,
-      [field]: value,
-      topic: current.topic || current.title || topicInput
-    }));
-    clearArtifacts();
-  }
-
-  function clearArtifacts() {
-    setResult(null);
-    updatePdfUrl('');
-  }
-
-  function updatePdfUrl(nextUrl) {
-    setPdfUrl((currentUrl) => {
-      if (currentUrl) URL.revokeObjectURL(currentUrl);
-      return nextUrl;
-    });
-  }
-
-  function reset() {
-    setTopicInput('');
-    setProject(EMPTY_PROJECT);
-    setFieldSuggestions([]);
-    setDecisions([]);
-    setQuestions([]);
-    setCustomNote('');
-    clearArtifacts();
-    setRunLog([]);
-    setError('');
-    setActiveTab('pdf');
-    setSuggestionIndex(0);
-    setDecisionIndex(0);
-  }
-
-  function downloadLatex() {
-    const proposal = result?.proposalLatex || '';
-    const blob = new Blob([proposal], { type: 'text/x-tex;charset=utf-8' });
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = href;
-    anchor.download = 'proposal.tex';
-    anchor.click();
-    URL.revokeObjectURL(href);
-  }
-
-  async function downloadPdf() {
-    if (!result?.proposalLatex) return;
-
-    setStatus('exporting');
-    setError('');
-
-    try {
-      const href = pdfUrl || (await exportPdfUrl(result.proposalLatex, project.title || 'proposal'));
-      const anchor = document.createElement('a');
-      anchor.href = href;
-      anchor.download = 'proposal.pdf';
-      anchor.click();
-      if (!pdfUrl) URL.revokeObjectURL(href);
-      setRunLog((current) => [...current, logEntry('Export', 'Downloaded proposal.pdf.')]);
-    } catch (requestError) {
-      setError(readError(requestError));
-    } finally {
-      setStatus('idle');
-    }
-  }
-
-  function saveMemory({ silent = false } = {}) {
     const snapshot = {
-      savedAt: new Date().toISOString(),
-      topicInput,
-      project,
-      fieldSuggestions,
-      decisions,
-      questions,
-      result: compactResult(result),
-      runLog,
-      activeTab,
-      suggestionIndex,
-      decisionIndex
+      activeStep,
+      isEditingIdea,
+      ideaInput,
+      ideaPreview,
+      analysisMode,
+      lastAnalyzedAt,
+      proposalBlueprint,
+      blueprintMode,
+      blueprintGeneratedAt,
+      blueprintStale,
+      relatedWorkPlan,
+      relatedWorkMode,
+      relatedWorkGeneratedAt,
+      relatedWorkStale,
+      notice
     };
 
     localStorage.setItem(MEMORY_KEY, JSON.stringify(snapshot));
-    setMemorySavedAt(snapshot.savedAt);
+  }, [
+    activeStep,
+    analysisMode,
+    blueprintGeneratedAt,
+    blueprintMode,
+    blueprintStale,
+    ideaInput,
+    ideaPreview,
+    isEditingIdea,
+    lastAnalyzedAt,
+    memoryReady,
+    notice,
+    proposalBlueprint,
+    relatedWorkGeneratedAt,
+    relatedWorkMode,
+    relatedWorkPlan,
+    relatedWorkStale
+  ]);
 
-    if (!silent) {
-      setRunLog((current) => [...current, logEntry('Memory', 'Saved workspace memory.')]);
+  function handleFieldChange(field, value) {
+    setIdeaInput((current) => ({
+      ...current,
+      [field]: value
+    }));
+
+    if (errors[field]) {
+      setErrors((current) => {
+        const next = { ...current };
+        delete next[field];
+        return next;
+      });
+    }
+
+    const hasBlueprint = Boolean(proposalBlueprint);
+    const hasRelatedWork = Boolean(relatedWorkPlan);
+
+    if (hasBlueprint && !blueprintStale) {
+      setBlueprintStale(true);
+    }
+
+    if (hasRelatedWork && !relatedWorkStale) {
+      setRelatedWorkStale(true);
+    }
+
+    if (hasBlueprint || hasRelatedWork) {
+      setNotice(
+        hasRelatedWork
+          ? 'Step 1 changed. Regenerate the proposal blueprint and related work plan before using later workflow stages.'
+          : 'Step 1 changed. Regenerate the proposal blueprint before using later workflow stages.'
+      );
     }
   }
 
-  async function loadSavedMemory({ silent = false } = {}) {
-    const raw = localStorage.getItem(MEMORY_KEY);
-    if (!raw) {
-      if (!silent) setError('No saved memory found.');
+  function handleLoadSample() {
+    setActiveStep('idea-intake');
+    setIsEditingIdea(true);
+    setIdeaInput(SAMPLE_IDEA_INPUT);
+    setIdeaPreview(null);
+    setAnalysisMode(null);
+    setLastAnalyzedAt('');
+    setProposalBlueprint(null);
+    setBlueprintMode(null);
+    setBlueprintStatus('idle');
+    setBlueprintError('');
+    setBlueprintGeneratedAt('');
+    setBlueprintStale(false);
+    setRelatedWorkPlan(null);
+    setRelatedWorkMode(null);
+    setRelatedWorkStatus('idle');
+    setRelatedWorkError('');
+    setRelatedWorkGeneratedAt('');
+    setRelatedWorkStale(false);
+    setErrors({});
+    setError('');
+    setNotice('Sample idea loaded. Analyze it to generate the Step 1 preview.');
+  }
+
+  function handleReset() {
+    setActiveStep('idea-intake');
+    setIsEditingIdea(true);
+    setIdeaInput(EMPTY_IDEA_INPUT);
+    setIdeaPreview(null);
+    setAnalysisMode(null);
+    setLastAnalyzedAt('');
+    setProposalBlueprint(null);
+    setBlueprintMode(null);
+    setBlueprintStatus('idle');
+    setBlueprintError('');
+    setBlueprintGeneratedAt('');
+    setBlueprintStale(false);
+    setRelatedWorkPlan(null);
+    setRelatedWorkMode(null);
+    setRelatedWorkStatus('idle');
+    setRelatedWorkError('');
+    setRelatedWorkGeneratedAt('');
+    setRelatedWorkStale(false);
+    setErrors({});
+    setError('');
+    setNotice('');
+    localStorage.removeItem(MEMORY_KEY);
+  }
+
+  function handleEditIdeaIntake() {
+    setActiveStep('idea-intake');
+    setIsEditingIdea(true);
+    setBlueprintError('');
+    setRelatedWorkError('');
+    setNotice(
+      relatedWorkPlan
+        ? 'Edit the idea intake, then re-analyze Step 1 before regenerating Steps 2 and 3.'
+        : proposalBlueprint
+          ? 'Edit the idea intake, then re-analyze Step 1 before regenerating Step 2.'
+          : ''
+    );
+  }
+
+  function handleAnalyzeIdea() {
+    const normalizedInput = normalizeIdeaInput(ideaInput);
+    const validationErrors = validateIdeaInput(normalizedInput);
+
+    setErrors(validationErrors);
+    setError('');
+    setBlueprintError('');
+
+    if (Object.keys(validationErrors).length) {
+      setIdeaPreview(null);
+      setAnalysisMode(null);
+      setActiveStep('idea-intake');
+      setIsEditingIdea(true);
+      setNotice('Fill the required research fields before generating the preview.');
       return;
     }
 
+    const templatePreview = buildTemplatePreview(normalizedInput);
+    const analyzedAt = new Date().toISOString();
+
+    setIntakeStatus('analyzing');
+    setIdeaInput(normalizedInput);
+    setIdeaPreview(templatePreview);
+    setAnalysisMode('template');
+    setLastAnalyzedAt(analyzedAt);
+    setActiveStep('idea-intake');
+    setIsEditingIdea(false);
+    setBlueprintStale(Boolean(proposalBlueprint));
+    setRelatedWorkStale(Boolean(relatedWorkPlan));
+    setNotice(
+      relatedWorkPlan
+        ? 'Step 1 updated. Regenerate the proposal blueprint and related work plan to sync Steps 2 and 3.'
+        : proposalBlueprint
+          ? 'Step 1 updated. Regenerate the proposal blueprint to sync Step 2 with the latest intake.'
+          : 'Step 1 complete. Generate the proposal blueprint to move into Step 2.'
+    );
+    setIntakeStatus('idle');
+  }
+
+  async function handleGenerateProposalBlueprint() {
+    if (!ideaPreview) {
+      setNotice('Complete Step 1 first so the proposal blueprint has a validated intake summary.');
+      return;
+    }
+
+    setActiveStep('proposal-blueprint');
+    setIsEditingIdea(false);
+    setBlueprintStatus('generating');
+    setBlueprintError('');
+    setRelatedWorkError('');
+    setError('');
+
     try {
-      const snapshot = JSON.parse(raw);
-      setTopicInput(snapshot.topicInput || '');
-      setProject({ ...EMPTY_PROJECT, ...(snapshot.project || {}) });
-      setFieldSuggestions(Array.isArray(snapshot.fieldSuggestions) ? snapshot.fieldSuggestions : []);
-      setDecisions(Array.isArray(snapshot.decisions) ? snapshot.decisions : []);
-      setQuestions(Array.isArray(snapshot.questions) ? snapshot.questions : []);
-      setResult(snapshot.result || null);
-      setRunLog(Array.isArray(snapshot.runLog) ? snapshot.runLog : []);
-      setActiveTab(snapshot.activeTab || 'pdf');
-      setSuggestionIndex(Number(snapshot.suggestionIndex || 0));
-      setDecisionIndex(Number(snapshot.decisionIndex || 0));
-      setMemorySavedAt(snapshot.savedAt || '');
-      setError('');
+      const data = await postJson('/api/blueprint', {
+        ideaInput,
+        ideaPreview
+      });
 
-      if (snapshot.result?.proposalLatex) {
-        try {
-          updatePdfUrl(await exportPdfUrl(snapshot.result.proposalLatex, snapshot.project?.title || 'proposal'));
-        } catch {
-          updatePdfUrl('');
-        }
-      } else {
-        updatePdfUrl('');
-      }
+      setProposalBlueprint(data.blueprint || null);
+      setBlueprintMode(data.mode === 'api' ? 'api' : 'template');
+      setBlueprintGeneratedAt(new Date().toISOString());
+      setBlueprintStale(false);
+      setRelatedWorkStale(Boolean(relatedWorkPlan));
+      setBlueprintStatus('idle');
+      setNotice(
+        relatedWorkPlan
+          ? 'Proposal blueprint refreshed. Regenerate Step 3 so the related work plan matches the latest scaffold.'
+          : data.mode === 'api'
+            ? 'Proposal blueprint generated with Gemini and saved as Step 2.'
+            : 'Proposal blueprint generated from the deterministic Stage 1 fallback.'
+      );
+    } catch (requestError) {
+      const fallbackBlueprint = buildClientFallbackBlueprint(ideaInput, ideaPreview);
 
-      if (!silent) {
-        setRunLog((current) => [...current, logEntry('Memory', 'Reloaded saved workspace memory.')]);
-      }
-    } catch {
-      setError('Saved memory is unreadable. Clear it and save again.');
+      setProposalBlueprint(fallbackBlueprint);
+      setBlueprintMode('template');
+      setBlueprintGeneratedAt(new Date().toISOString());
+      setBlueprintStale(false);
+      setRelatedWorkStale(Boolean(relatedWorkPlan));
+      setBlueprintStatus('idle');
+      setBlueprintError('');
+      setNotice(
+        `Blueprint API was unavailable, so the app used the deterministic demo fallback instead. ${readError(requestError)}`
+      );
     }
   }
 
-  function clearSavedMemory() {
-    localStorage.removeItem(MEMORY_KEY);
-    setMemorySavedAt('');
+  async function handleGenerateRelatedWorkPlan() {
+    if (!proposalBlueprint) {
+      setNotice('Generate Step 2 first so the related work plan has a proposal scaffold to analyze.');
+      return;
+    }
+
+    if (blueprintStale) {
+      setNotice('Refresh Step 2 before generating Step 3 so the literature plan matches the latest blueprint.');
+      return;
+    }
+
+    setActiveStep('related-work');
+    setIsEditingIdea(false);
+    setRelatedWorkStatus('generating');
+    setRelatedWorkError('');
+    setError('');
+
+    try {
+      const data = await postJson('/api/related-work', {
+        ideaInput,
+        proposalBlueprint
+      });
+
+      setRelatedWorkPlan(data.relatedWorkPlan || null);
+      setRelatedWorkMode(data.mode === 'api' ? 'api' : 'template');
+      setRelatedWorkGeneratedAt(new Date().toISOString());
+      setRelatedWorkStale(false);
+      setRelatedWorkStatus('idle');
+      setNotice(
+        data.mode === 'api'
+          ? 'Related work plan generated with Gemini and saved as Step 3.'
+          : 'Related work plan generated from the deterministic Stage 1 fallback.'
+      );
+    } catch (requestError) {
+      const fallbackPlan = buildClientFallbackRelatedWorkPlan(ideaInput, proposalBlueprint);
+
+      setRelatedWorkPlan(fallbackPlan);
+      setRelatedWorkMode('template');
+      setRelatedWorkGeneratedAt(new Date().toISOString());
+      setRelatedWorkStale(false);
+      setRelatedWorkStatus('idle');
+      setRelatedWorkError('');
+      setNotice(
+        `Related-work API was unavailable, so the app used the deterministic demo fallback instead. ${readError(requestError)}`
+      );
+    }
   }
 
+  const showingEditor = isEditingIdea || !ideaPreview;
+
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <h1>Research Proposal Agent</h1>
-        <span className="status-pill">
-          <Sparkles size={16} aria-hidden="true" />
-          {result?.mode || (fieldSuggestions.length ? 'structuring' : 'ready')}
-        </span>
+    <main className="studio-shell">
+      <header className="studio-header">
+        <div className="header-copy">
+          <span className="eyebrow">Stage 1 Prototype</span>
+          <h1>AI Proposal Studio</h1>
+          <p>
+            Guide a rough research idea into a stronger proposal workflow. This screen now carries the user from structured
+            idea intake into a proposal blueprint scaffold.
+          </p>
+        </div>
+
+        <div className="header-status-group">
+          <span className="status-pill current-step">
+            <FlaskConical size={16} aria-hidden="true" />
+            Step {currentStepNumber} of {WORKFLOW_STEPS.length}
+          </span>
+          <span className="status-pill save-status">
+            <Save size={16} aria-hidden="true" />
+            Auto-saves locally
+          </span>
+        </div>
       </header>
 
-      <section className="workspace single-pane">
-        <section className="workflow-artifact">
-          <div className="topic-launch">
-            <label htmlFor="project-topic">
-              Rough Idea
-              <input
-                id="project-topic"
-                value={topicInput}
-                onChange={(event) => setTopicInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') startAgent();
-                }}
-                placeholder="Example: Agent for citation-grounded literature review"
+      <section className="studio-body">
+        <WorkflowProgressRail activeStep={activeStep} completedSteps={completedSteps} steps={WORKFLOW_STEPS} />
+
+        <section className="studio-main">
+          {(notice || error) && (
+            <div className="banner-stack">
+              {notice ? <p className="info-banner">{notice}</p> : null}
+              {error ? (
+                <p className="error-banner">
+                  <AlertCircle size={16} aria-hidden="true" />
+                  {error}
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          {showingEditor ? (
+            <div className="workspace-grid">
+              <IdeaIntakeScreen
+                completedFieldCount={completedFieldCount}
+                errors={errors}
+                hasPreview={Boolean(ideaPreview)}
+                ideaInput={ideaInput}
+                onAnalyze={handleAnalyzeIdea}
+                onFieldChange={handleFieldChange}
+                onLoadSample={handleLoadSample}
+                onReset={handleReset}
+                status={intakeStatus}
               />
-            </label>
-            <div className="actions framework-actions">
-              <button className="primary" disabled={!topicInput.trim() || status !== 'idle'} onClick={startAgent} type="button">
-                {status === 'starting' ? <Loader2 className="spin" size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
-                Structure Idea
-              </button>
-              <button className="secondary" disabled={status !== 'idle'} onClick={startSampleAgent} type="button">
-                <Sparkles size={18} aria-hidden="true" />
-                Sample
-              </button>
-              <button className="secondary icon-button" onClick={reset} type="button" aria-label="Reset">
-                <RefreshCw size={18} aria-hidden="true" />
-              </button>
+
+              <IdeaPreviewPanel
+                analysisMode={analysisMode}
+                ideaInput={ideaInput}
+                ideaPreview={ideaPreview}
+                lastAnalyzedAt={lastAnalyzedAt}
+                status={intakeStatus}
+              />
             </div>
-          </div>
+          ) : activeStep === 'idea-intake' ? (
+            <div className="workspace-grid summary-grid">
+              <CompletedIdeaSummary
+                blueprintExists={Boolean(proposalBlueprint)}
+                blueprintStale={blueprintStale}
+                blueprintStatus={blueprintStatus}
+                ideaInput={ideaInput}
+                ideaPreview={ideaPreview}
+                lastAnalyzedAt={lastAnalyzedAt}
+                onEdit={handleEditIdeaIntake}
+                onGenerateBlueprint={handleGenerateProposalBlueprint}
+              />
 
-          <div className="memory-bar">
-            <div>
-              <strong>Memory</strong>
-              <span>{memorySavedAt ? `Saved ${formatSavedAt(memorySavedAt)}` : 'No saved workspace yet'}</span>
+              <IdeaPreviewPanel
+                analysisMode={analysisMode}
+                ideaInput={ideaInput}
+                ideaPreview={ideaPreview}
+                lastAnalyzedAt={lastAnalyzedAt}
+                status={intakeStatus}
+              />
             </div>
-            <div className="memory-actions">
-              <button className="secondary" type="button" onClick={() => saveMemory()}>
-                Save
-              </button>
-              <button className="secondary" type="button" onClick={() => loadSavedMemory()}>
-                Reload
-              </button>
-              <button className="secondary" type="button" onClick={clearSavedMemory}>
-                Clear
-              </button>
-            </div>
-          </div>
+          ) : (
+            <div className="blueprint-workspace">
+              <CompletedIdeaSummary
+                blueprintExists={Boolean(proposalBlueprint)}
+                blueprintStale={blueprintStale}
+                blueprintStatus={blueprintStatus}
+                ideaInput={ideaInput}
+                ideaPreview={ideaPreview}
+                lastAnalyzedAt={lastAnalyzedAt}
+                onEdit={handleEditIdeaIntake}
+                onGenerateBlueprint={handleGenerateProposalBlueprint}
+              />
 
-          {error ? <p className="error-banner">{error}</p> : null}
+              <ProposalBlueprintPanel
+                blueprint={proposalBlueprint}
+                blueprintError={blueprintError}
+                blueprintGeneratedAt={blueprintGeneratedAt}
+                blueprintMode={blueprintMode}
+                blueprintStatus={blueprintStatus}
+                blueprintStale={blueprintStale}
+                onGenerate={handleGenerateProposalBlueprint}
+                onGenerateRelatedWork={handleGenerateRelatedWorkPlan}
+                relatedWorkPlanExists={Boolean(relatedWorkPlan)}
+                relatedWorkStale={relatedWorkStale}
+                relatedWorkStatus={relatedWorkStatus}
+              />
 
-
-          <div className="workflow-grid" aria-label="Workflow stages">
-            {STAGES.map(([number, title, description], index) => (
-              <article className="stage-card" key={title}>
-                <div className="stage-topline">
-                  <span className="stage-number">{number}</span>
-                  <span className={`stage-status ${stageStatus(index, fieldSuggestions, decisions, project, result)}`}>
-                    {stageLabel(index, fieldSuggestions, decisions, project, result)}
-                  </span>
-                </div>
-                <h3>{title}</h3>
-                <p>{description}</p>
-              </article>
-            ))}
-          </div>
-
-          <div className="workspace-grid">
-            <section className="workspace-panel suggestions-panel">
-              <PanelHeader title="LLM Suggested Structure" meta={`${fieldSuggestions.length} fields`} />
-              {fieldSuggestions.length ? (
-                <div className="suggestion-deck">
-                  <div className="deck-progress">
-                    <span>{Math.min(suggestionIndex + 1, fieldSuggestions.length)} / {fieldSuggestions.length}</span>
-                    <strong>{acceptedSuggestionCount} accepted</strong>
-                  </div>
-                  {currentSuggestion ? (
-                    <article className="suggestion-card active-card" key={`${currentSuggestion.field}-${currentSuggestion.value}`}>
-                      <div className="card-line">
-                        <h3>{currentSuggestion.label || labelForField(currentSuggestion.field)}</h3>
-                        <span className={`priority ${String(currentSuggestion.confidence || 'medium').toLowerCase()}`}>
-                          {currentSuggestion.confidence || 'Medium'}
-                        </span>
-                      </div>
-                      <p>{currentSuggestion.value}</p>
-                      <small>{currentSuggestion.reason}</small>
-                      <div className="deck-actions">
-                        <button
-                          className={project[currentSuggestion.field] === currentSuggestion.value ? 'secondary accepted' : 'primary'}
-                          type="button"
-                          onClick={() => acceptSuggestion(currentSuggestion)}
-                        >
-                          <CheckCircle2 size={16} aria-hidden="true" />
-                          {project[currentSuggestion.field] === currentSuggestion.value ? 'Accepted' : 'Accept and Next'}
-                        </button>
-                        <button className="secondary" type="button" onClick={skipSuggestion}>
-                          Skip
-                        </button>
-                      </div>
-                    </article>
-                  ) : null}
-                  <div className="deck-nav">
-                    <button
-                      className="secondary"
-                      type="button"
-                      disabled={suggestionIndex === 0}
-                      onClick={() => setSuggestionIndex((current) => Math.max(current - 1, 0))}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      className="secondary"
-                      type="button"
-                      disabled={suggestionIndex >= fieldSuggestions.length - 1}
-                      onClick={() => setSuggestionIndex((current) => Math.min(current + 1, fieldSuggestions.length - 1))}
-                    >
-                      Next
-                    </button>
-                  </div>
-                  <div className="deck-strip" aria-label="Suggestion progress">
-                    {fieldSuggestions.map((suggestion, index) => (
-                      <button
-                        key={`${suggestion.field}-${index}`}
-                        className={[
-                          'deck-dot',
-                          index === suggestionIndex ? 'current' : '',
-                          project[suggestion.field] === suggestion.value ? 'done' : ''
-                        ].join(' ')}
-                        type="button"
-                        aria-label={`Open ${suggestion.label || labelForField(suggestion.field)}`}
-                        onClick={() => setSuggestionIndex(index)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <EmptyState text="Enter a rough idea, then let the model structure it." compact />
-              )}
-            </section>
-
-            <section className="workspace-panel decisions-panel">
-              <PanelHeader title="Decision Needed" meta={`${decisions.length} open`} />
-              {decisions.length ? (
-                <div className="decision-deck">
-                  <div className="deck-progress">
-                    <span>{Math.min(decisionIndex + 1, decisions.length)} / {decisions.length}</span>
-                    <strong>{decisions.length} open</strong>
-                  </div>
-                  {currentDecision ? (
-                    <article className="decision-card active-card" key={currentDecision.id}>
-                      <h3>{currentDecision.title}</h3>
-                      <p>{currentDecision.question}</p>
-                      <div className="option-stack">
-                        {currentDecision.options.map((option) => (
-                          <button
-                            className="option-button"
-                            key={`${currentDecision.id}-${option.label}`}
-                            type="button"
-                            onClick={() => chooseOption(currentDecision, option)}
-                          >
-                            <strong>{option.label}</strong>
-                            <span>{option.value}</span>
-                            <small>{option.rationale}</small>
-                          </button>
-                        ))}
-                      </div>
-                      <div className="deck-actions">
-                        <button className="secondary" type="button" onClick={skipDecision}>
-                          Skip
-                        </button>
-                      </div>
-                    </article>
-                  ) : null}
-                  <div className="deck-nav">
-                    <button
-                      className="secondary"
-                      type="button"
-                      disabled={decisionIndex === 0}
-                      onClick={() => setDecisionIndex((current) => Math.max(current - 1, 0))}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      className="secondary"
-                      type="button"
-                      disabled={decisionIndex >= decisions.length - 1}
-                      onClick={() => setDecisionIndex((current) => Math.min(current + 1, decisions.length - 1))}
-                    >
-                      Next
-                    </button>
-                  </div>
-                  <div className="deck-strip" aria-label="Decision progress">
-                    {decisions.map((decision, index) => (
-                      <button
-                        key={`${decision.id}-${index}`}
-                        className={['deck-dot', index === decisionIndex ? 'current' : ''].join(' ')}
-                        type="button"
-                        aria-label={`Open ${decision.title}`}
-                        onClick={() => setDecisionIndex(index)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <EmptyState text="No major decision is open. Review the accepted state or draft the proposal." compact />
-              )}
-
-              <section className="custom-note">
-                <h3>Extra Note</h3>
-                <textarea
-                  value={customNote}
-                  onChange={(event) => setCustomNote(event.target.value)}
-                  placeholder={currentQuestion?.question || 'Add a detail the options missed.'}
+              {activeStep === 'related-work' || relatedWorkPlan || relatedWorkStatus !== 'idle' ? (
+                <RelatedWorkPlanPanel
+                  onGenerate={handleGenerateRelatedWorkPlan}
+                  relatedWorkError={relatedWorkError}
+                  relatedWorkGeneratedAt={relatedWorkGeneratedAt}
+                  relatedWorkMode={relatedWorkMode}
+                  relatedWorkPlan={relatedWorkPlan}
+                  relatedWorkStale={relatedWorkStale}
+                  relatedWorkStatus={relatedWorkStatus}
                 />
-                <button className="primary" disabled={!customNote.trim() || status !== 'idle'} onClick={submitCustomNote} type="button">
-                  {status === 'answering' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
-                  Let LLM Integrate
-                </button>
-              </section>
-            </section>
-
-            <section className="workspace-panel state-panel">
-              <PanelHeader title="Accepted Project State" meta={`${acceptedCount}/${PROJECT_FIELDS.length} ready`} />
-              <label>
-                Project Title
-                <input value={project.title} onChange={(event) => updateProjectField('title', event.target.value)} />
-              </label>
-              {PROJECT_FIELDS.map(([field, label]) => (
-                <label key={field}>
-                  {label}
-                  <textarea value={project[field] || ''} onChange={(event) => updateProjectField(field, event.target.value)} />
-                </label>
-              ))}
-              <button className="primary" disabled={!project.title || status !== 'idle'} onClick={generateProposal} type="button">
-                {status === 'drafting' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <FileText size={16} aria-hidden="true" />}
-                Generate Proposal
-              </button>
-            </section>
-          </div>
-
-          <div className="workflow-columns">
-            <section className="workflow-panel">
-              <h2>Run Log</h2>
-              {runLog.length ? (
-                <ol className="run-log">
-                  {runLog.map((entry) => (
-                    <li key={entry.id}>
-                      <span>{entry.stage}</span>
-                      <p>{entry.message}</p>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <EmptyState text="Run log appears after the idea is structured." compact />
-              )}
-            </section>
-
-            <section className="workflow-panel artifacts-panel">
-              <div className="artifact-toolbar">
-                <nav className="tabs" aria-label="Generated artifacts">
-                  {TABS.map(([id, Icon, label]) => (
-                    <button
-                      key={id}
-                      className={activeTab === id ? 'tab active' : 'tab'}
-                      type="button"
-                      onClick={() => setActiveTab(id)}
-                    >
-                      <Icon size={17} aria-hidden="true" />
-                      {label}
-                    </button>
-                  ))}
-                </nav>
-                <button className="secondary" type="button" disabled={!result?.proposalLatex} onClick={downloadLatex}>
-                  <Download size={17} aria-hidden="true" />
-                  LaTeX
-                </button>
-                <button
-                  className="primary"
-                  type="button"
-                  disabled={!result?.proposalLatex || status !== 'idle'}
-                  onClick={downloadPdf}
-                >
-                  {status === 'exporting' ? <Loader2 className="spin" size={17} aria-hidden="true" /> : <Download size={17} aria-hidden="true" />}
-                  PDF
-                </button>
-              </div>
-
-              <div className="artifact-summary">
-                <div>
-                  <span>Coverage</span>
-                  <strong>{matrixStats.total ? `${matrixStats.covered}/${matrixStats.total}` : '0/0'}</strong>
-                </div>
-                <div>
-                  <span>Accepted</span>
-                  <strong>{acceptedCount}/{PROJECT_FIELDS.length}</strong>
-                </div>
-                <div>
-                  <span>Provider</span>
-                  <strong>{result?.provider || 'waiting'}</strong>
-                </div>
-              </div>
-
-              {renderArtifact(activeTab, result, pdfUrl)}
-            </section>
-          </div>
+              ) : null}
+            </div>
+          )}
         </section>
       </section>
     </main>
   );
 }
 
-async function postJson(url, body) {
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  const data = await response.json();
+function buildTemplatePreview(ideaInput) {
+  const missingInformation = collectMissingInformation(ideaInput);
 
-  if (!response.ok) {
-    throw new Error(data.detail || data.error || 'Request failed.');
-  }
-
-  return data;
-}
-
-async function exportPdfUrl(proposalLatex, title) {
-  const response = await fetch('/api/export/pdf', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      title,
-      proposalLatex
-    })
-  });
-
-  if (!response.ok) {
-    const data = await response.json();
-    throw new Error(data.detail || data.error || 'PDF export failed.');
-  }
-
-  const blob = await response.blob();
-  return URL.createObjectURL(blob);
-}
-
-function renderArtifact(activeTab, result, pdfUrl) {
-  if (!result) {
-    return <EmptyState text="Proposal artifacts appear after Generate Proposal." />;
-  }
-
-  if (activeTab === 'pdf') {
-    return pdfUrl ? (
-      <iframe className="pdf-preview" src={pdfUrl} title="Compiled proposal PDF" />
-    ) : (
-      <EmptyState text="PDF preview is rendering." />
-    );
-  }
-
-  if (activeTab === 'matrix') {
-    return (
-      <div className="matrix-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Requirement</th>
-              <th>Status</th>
-              <th>Evidence</th>
-              <th>Fix</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(result.complianceMatrix || []).map((row, index) => (
-              <tr key={`${row.requirement}-${index}`}>
-                <td>{row.requirement}</td>
-                <td>
-                  <span className={/^covered$/i.test(row.status) ? 'badge covered' : 'badge needs-work'}>{row.status}</span>
-                </td>
-                <td>{row.evidence}</td>
-                <td>{row.fix}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  if (activeTab === 'evaluation') {
-    return <pre>{result.evaluationReport}</pre>;
-  }
-
-  return <pre className="proposal-output">{result.proposalLatex}</pre>;
-}
-
-function PanelHeader({ title, meta }) {
-  return (
-    <div className="panel-header">
-      <h2>{title}</h2>
-      <span>{meta}</span>
-    </div>
-  );
-}
-
-function EmptyState({ text, compact = false }) {
-  return (
-    <div className={compact ? 'empty-state compact' : 'empty-state'}>
-      <FileText size={compact ? 24 : 32} aria-hidden="true" />
-      <p>{text}</p>
-    </div>
-  );
-}
-
-function stageStatus(index, fieldSuggestions, decisions, project, result) {
-  if (index === 0 && fieldSuggestions.length) return 'status-complete';
-  if (index === 1 && decisions.length) return 'status-complete';
-  if (index === 2 && PROJECT_FIELDS.some(([field]) => project[field])) return 'status-complete';
-  if (index >= 3 && result) return 'status-complete';
-  return 'status-waiting';
-}
-
-function stageLabel(index, fieldSuggestions, decisions, project, result) {
-  if (index === 0 && fieldSuggestions.length) return 'Shown';
-  if (index === 1 && decisions.length) return 'Shown';
-  if (index === 2 && PROJECT_FIELDS.some(([field]) => project[field])) return 'Shown';
-  if (index >= 3 && result) return 'Shown';
-  return 'Ready';
-}
-
-function countCovered(rows = []) {
-  return rows.filter((row) => /^covered$/i.test(row.status)).length;
-}
-
-function labelForField(field) {
-  const found = PROJECT_FIELDS.find(([key]) => key === field);
-  return found?.[1] || 'Field';
-}
-
-function logEntry(stage, message) {
   return {
-    id: `${stage}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    stage,
-    message
+    detectedTopic: joinSegments([ideaInput.topic, ideaInput.domain && `Domain: ${ideaInput.domain}`]),
+    problem: ideaInput.problem,
+    motivation: joinSegments([
+      ideaInput.motivation,
+      ideaInput.beneficiaries && `Primary beneficiaries: ${ideaInput.beneficiaries}`
+    ]),
+    possibleContribution: ideaInput.expectedContribution || inferContribution(ideaInput),
+    missingInformation
   };
+}
+
+function validateIdeaInput(ideaInput) {
+  const nextErrors = {};
+
+  if (!ideaInput.topic) nextErrors.topic = 'Research topic is required.';
+  if (!ideaInput.problem) nextErrors.problem = 'Problem framing is required.';
+  if (!ideaInput.motivation) nextErrors.motivation = 'Why the problem matters is required.';
+
+  return nextErrors;
+}
+
+function normalizeIdeaInput(ideaInput) {
+  return Object.fromEntries(
+    Object.entries(ideaInput).map(([key, value]) => [
+      key,
+      typeof value === 'string'
+        ? value
+            .split('\n')
+            .map((line) => line.trim())
+            .join('\n')
+            .trim()
+        : ''
+    ])
+  );
+}
+
+function collectMissingInformation(ideaInput) {
+  const missing = [];
+
+  if (!ideaInput.beneficiaries) missing.push('Identify the primary user or stakeholder group that benefits from solving the problem.');
+  if (!ideaInput.keywords) missing.push('Add known papers, authors, or search keywords to support later related-work retrieval.');
+  if (!ideaInput.methods) missing.push('Clarify the possible technical method or workflow the project will explore.');
+  if (!ideaInput.datasets) missing.push('List candidate datasets, tools, systems, or reference materials that the workflow may rely on.');
+  if (!ideaInput.expectedContribution) missing.push('State the expected research contribution or output of the project.');
+  if (ideaInput.uncertainties) missing.push(`Open uncertainties: ${ideaInput.uncertainties}`);
+
+  if (!missing.length) {
+    missing.push('Define the evaluation rubric, comparison baseline, and student population in the next workflow stage.');
+  }
+
+  return missing;
+}
+
+function inferContribution(ideaInput) {
+  if (ideaInput.methods) {
+    return `A structured proposal blueprint built from ${ideaInput.methods.toLowerCase()} and used as the handoff to later planning and critique stages.`;
+  }
+
+  return `A stronger proposal blueprint for ${ideaInput.topic.toLowerCase()} with clearer motivation, scope, and missing-information flags.`;
+}
+
+function buildClientFallbackBlueprint(ideaInput, ideaPreview) {
+  const contribution = clean(ideaInput.expectedContribution) || ideaPreview?.possibleContribution || inferContribution(ideaInput);
+  const missingInformation = [...new Set([...(ideaPreview?.missingInformation || []), ...collectMissingInformation(ideaInput)])].slice(0, 6);
+
+  return {
+    workingTitle: titleCase(ideaInput.topic || 'Research Proposal Blueprint'),
+    oneSentenceSummary: `${titleCase(ideaInput.topic || 'This project')} organizes the rough idea into a proposal scaffold for ${ideaInput.domain || 'the target research area'}.`,
+    problemStatement:
+      ideaInput.problem || 'The problem statement still needs a concrete user, context, and consequence before final drafting.',
+    motivation:
+      joinSegments([
+        ideaInput.motivation,
+        ideaInput.beneficiaries ? `Primary beneficiaries: ${ideaInput.beneficiaries}` : ''
+      ]) || 'The proposal still needs a stronger explanation of why the problem matters.',
+    researchGap: `Current support around ${ideaInput.keywords || ideaInput.domain || 'this topic'} does not yet clearly turn rough research ideas into structured proposal components with explicit evaluation and revision logic.`,
+    proposedContribution: contribution,
+    researchQuestions: [
+      `How can ${ideaInput.topic || 'this workflow'} preserve the student's original intent while sharpening the proposal structure?`,
+      'What information must be surfaced early so critique and revision stages can improve the proposal effectively?',
+      'How should the workflow demonstrate that the blueprint is stronger than the original rough idea?'
+    ],
+    hypotheses: [
+      'A structured blueprint stage will surface missing proposal components earlier than free-form drafting alone.',
+      'Explicitly framing the research gap, contribution, and evaluation plan will make later revisions more focused and credible.'
+    ],
+    proposedMethod:
+      ideaInput.methods ||
+      'Use the intake data to draft a research-oriented scaffold, surface missing information, and pass the result into later critique and revision stages.',
+    datasetsToolsSystems: ideaInput.datasets || 'Candidate datasets, tools, and systems still need to be selected for the method plan.',
+    evaluationPlan:
+      'Compare the original rough idea against the generated blueprint for clarity, proposal-section coverage, feasibility, and readiness for critique.',
+    expectedResults: `${contribution} The expected result is a clearer proposal scaffold that is easier to critique and revise in later stages.`,
+    intellectualMerit: `The blueprint sharpens the proposal logic in ${ideaInput.domain || 'the target domain'} and makes the contribution more explicit: ${contribution}`,
+    broaderImpacts:
+      ideaInput.beneficiaries
+        ? `The work could benefit ${ideaInput.beneficiaries} by making early-stage proposal development more structured and easier to revise.`
+        : 'The work could broaden access to stronger proposal development by helping students and advisors identify missing research logic earlier.',
+    missingInformation,
+    suggestedNextSteps: [
+      'Confirm that the blueprint framing matches the original research intent.',
+      'Gather related work using the topic, keywords, and research gap.',
+      'Strengthen the evaluation plan with concrete metrics or comparison criteria.',
+      'Run a critique pass focused on scope, novelty, and unsupported assumptions.'
+    ]
+  };
+}
+
+function buildClientFallbackRelatedWorkPlan(ideaInput, proposalBlueprint) {
+  const keyConcepts = dedupeStrings(
+    [
+      ideaInput.topic,
+      ideaInput.domain,
+      ideaInput.keywords,
+      ideaInput.methods,
+      ideaInput.datasets,
+      proposalBlueprint.proposedContribution,
+      proposalBlueprint.researchGap,
+      ...(proposalBlueprint.researchQuestions || [])
+    ]
+      .flatMap(splitKeywords)
+      .filter(Boolean)
+  ).slice(0, 12);
+
+  const relatedWorkBuckets = [
+    {
+      title: `Problem framing in ${ideaInput.domain || 'the target domain'}`,
+      description: `Look for papers that define the core problem, stakeholders, and failure modes around ${ideaInput.problem || ideaInput.topic || 'this research area'}.`,
+      whyItMatters: 'This bucket gives the proposal a grounded motivation and reduces unsupported assumptions about the problem.',
+      exampleSearchTerms: dedupeStrings([keyConcepts[0], keyConcepts[1], 'problem framing', ideaInput.domain]).slice(0, 4)
+    },
+    {
+      title: 'Methods and workflow approaches',
+      description: `Search for systems or methods related to ${ideaInput.methods || proposalBlueprint.proposedMethod || ideaInput.topic || 'the proposed approach'}.`,
+      whyItMatters: 'This bucket helps compare the proposed method against adjacent technical patterns and prior workflows.',
+      exampleSearchTerms: dedupeStrings(splitKeywords(ideaInput.methods || proposalBlueprint.proposedMethod).concat(['workflow', 'method'])).slice(0, 4)
+    },
+    {
+      title: 'Evaluation and benchmark design',
+      description: `Find work that evaluates similar systems, rubrics, or benchmarks connected to ${proposalBlueprint.evaluationPlan || ideaInput.topic || 'the proposal topic'}.`,
+      whyItMatters: 'This bucket helps the proposal borrow credible metrics, baselines, and evidence patterns.',
+      exampleSearchTerms: dedupeStrings(splitKeywords(proposalBlueprint.evaluationPlan).concat(['evaluation', 'benchmark', 'baseline'])).slice(0, 4)
+    },
+    {
+      title: 'Contribution and novelty comparisons',
+      description: `Gather papers making claims similar to ${proposalBlueprint.proposedContribution || ideaInput.expectedContribution || 'the proposed contribution'}.`,
+      whyItMatters: 'This bucket helps test whether the contribution is actually distinct after real sources are reviewed.',
+      exampleSearchTerms: dedupeStrings(splitKeywords(proposalBlueprint.proposedContribution || ideaInput.expectedContribution).concat(['novelty', 'comparison'])).slice(0, 4)
+    }
+  ];
+
+  if (clean(ideaInput.datasets) || clean(proposalBlueprint.datasetsToolsSystems)) {
+    relatedWorkBuckets.push({
+      title: 'Datasets, tools, and systems',
+      description: `Review source materials connected to ${ideaInput.datasets || proposalBlueprint.datasetsToolsSystems}.`,
+      whyItMatters: 'This bucket grounds the method in concrete resources and reproducibility constraints.',
+      exampleSearchTerms: dedupeStrings(splitKeywords(ideaInput.datasets || proposalBlueprint.datasetsToolsSystems).concat(['dataset', 'tool', 'system'])).slice(0, 4)
+    });
+  }
+
+  return {
+    searchQueries: dedupeStrings([
+      joinSegments([ideaInput.topic, ideaInput.domain, 'related work']),
+      joinSegments([keyConcepts[0], keyConcepts[1], 'survey']),
+      joinSegments([ideaInput.topic, ideaInput.methods || proposalBlueprint.proposedMethod, 'evaluation']),
+      joinSegments([proposalBlueprint.researchGap, 'search query']),
+      joinSegments([proposalBlueprint.proposedContribution, 'baseline comparison']),
+      joinSegments([ideaInput.topic, 'critique', 'revision', 'proposal'])
+    ]).slice(0, 8),
+    keyConcepts,
+    relatedWorkBuckets,
+    suggestedVenuesOrSources: buildSuggestedVenueHints(ideaInput.domain),
+    literatureGapQuestions: [
+      `What existing research already addresses problems close to ${ideaInput.topic || 'this proposal'}?`,
+      `How do prior methods evaluate ideas similar to ${proposalBlueprint.proposedMethod || ideaInput.methods || 'the proposed method'}?`,
+      'Where does the literature disagree on the best framing, metric, or baseline for this problem?',
+      'Which claims in the proposal would remain weak without real literature support?'
+    ],
+    unsupportedClaimWarnings: [
+      'Do not claim novelty until related work is retrieved and compared against the proposal contribution.',
+      'Do not cite specific papers, authors, or venues until the sources are actually found and verified.',
+      'Do not claim improvement over baselines before the evaluation plan and comparison targets are defined.',
+      clean(ideaInput.datasets) || clean(proposalBlueprint.datasetsToolsSystems)
+        ? 'Treat dataset or tool choices as provisional until real prior work shows they are appropriate.'
+        : 'Avoid feasibility or reproducibility claims until candidate datasets, tools, or systems are identified.'
+    ],
+    nextSteps: [
+      'Run each query in a real academic search tool and save promising sources by bucket.',
+      'Find at least one survey, one methods paper, and one evaluation or benchmark paper.',
+      'Map retrieved sources back to the proposal problem statement, research gap, and evaluation plan.',
+      'Revise contribution or novelty language that the literature does not support.'
+    ]
+  };
+}
+
+function hasWorkspaceContent(ideaInput, ideaPreview, proposalBlueprint, relatedWorkPlan) {
+  return (
+    Object.values(ideaInput).some((value) => Boolean(clean(value))) ||
+    Boolean(ideaPreview) ||
+    Boolean(proposalBlueprint) ||
+    Boolean(relatedWorkPlan)
+  );
+}
+
+async function postJson(url, body) {
+  const apiBases = getApiBaseCandidates();
+  let lastError = new Error('Request failed.');
+
+  for (const apiBase of apiBases) {
+    try {
+      const response = await fetch(`${apiBase}${url}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const text = await response.text();
+      let data = {};
+
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          if (!response.ok) {
+            throw new Error(extractResponseError(text));
+          }
+
+          throw new Error(text.slice(0, 180));
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || 'Request failed.');
+      }
+
+      return data;
+    } catch (requestError) {
+      lastError = requestError instanceof Error ? requestError : new Error('Request failed.');
+    }
+  }
+
+  throw lastError;
+}
+
+function joinSegments(parts) {
+  return parts.filter(Boolean).join(' ');
+}
+
+function splitKeywords(value) {
+  return clean(value)
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function dedupeStrings(values) {
+  const seen = new Set();
+
+  return values.filter((value) => {
+    const cleaned = clean(value);
+    if (!cleaned) return false;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function buildSuggestedVenueHints(domain) {
+  const normalized = clean(domain).toLowerCase();
+  const venues = ['Survey papers and literature reviews', 'Semantic Scholar keyword search', 'Google Scholar keyword search', 'arXiv for recent preprints'];
+
+  if (/human-ai|hci|interaction|user/.test(normalized)) {
+    venues.push('CHI, CSCW, and IUI venue families');
+  }
+
+  if (/nlp|language|llm|natural language/.test(normalized)) {
+    venues.push('ACL, EMNLP, NAACL, and Findings venue families');
+  }
+
+  if (/machine learning|deep learning|ai|reasoning/.test(normalized)) {
+    venues.push('NeurIPS, ICML, and ICLR venue families');
+  }
+
+  if (/education|learning|student|teaching/.test(normalized)) {
+    venues.push('LAK, EDM, and AIED venue families');
+  }
+
+  venues.push('Annotated proposal examples and proposal guides for structure-only grounding');
+
+  return dedupeStrings(venues).slice(0, 8);
+}
+
+function getApiBaseCandidates() {
+  if (typeof window === 'undefined') {
+    return [''];
+  }
+
+  const hostname = window.location.hostname;
+  const isLocalHost = ['127.0.0.1', 'localhost', '::1'].includes(hostname);
+  const candidates = [''];
+
+  if (import.meta.env.DEV || isLocalHost) {
+    candidates.unshift(`http://${hostname || '127.0.0.1'}:8787`, 'http://127.0.0.1:8787', 'http://localhost:8787');
+  }
+
+  return dedupeStrings(candidates);
+}
+
+function extractResponseError(text) {
+  const compact = text.replace(/\s+/g, ' ').trim();
+  const preMatch = compact.match(/<pre>(.*?)<\/pre>/i);
+
+  if (preMatch?.[1]) {
+    return preMatch[1];
+  }
+
+  return compact.slice(0, 180) || 'Request failed.';
+}
+
+function titleCase(value) {
+  return clean(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `${word.slice(0, 1).toUpperCase()}${word.slice(1)}`)
+    .join(' ');
+}
+
+function clean(value) {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function readError(error) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function compactResult(result) {
-  if (!result) return null;
-
-  return {
-    mode: result.mode,
-    provider: result.provider,
-    proposalLatex: result.proposalLatex,
-    complianceMatrix: result.complianceMatrix,
-    evaluationReport: result.evaluationReport,
-    questions: result.questions
-  };
-}
-
-function formatSavedAt(value) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return 'recently';
-  }
-
-  return date.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return error instanceof Error ? error.message : 'Request failed.';
 }
 
 export default App;

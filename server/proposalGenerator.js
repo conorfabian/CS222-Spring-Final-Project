@@ -103,6 +103,65 @@ Return strict JSON:
 
 First infer concrete proposal data from the rough idea. Give the user suggested data and selectable options before asking open-ended questions. Ask open-ended questions only for information that cannot be reasonably inferred.`;
 
+const BLUEPRINT_SYSTEM_PROMPT = `You are a graduate research proposal coach helping a student turn a rough research idea into a strong proposal blueprint.
+
+Return strict JSON with this exact shape:
+{
+  "workingTitle": "",
+  "oneSentenceSummary": "",
+  "problemStatement": "",
+  "motivation": "",
+  "researchGap": "",
+  "proposedContribution": "",
+  "researchQuestions": ["", ""],
+  "hypotheses": ["", ""],
+  "proposedMethod": "",
+  "datasetsToolsSystems": "",
+  "evaluationPlan": "",
+  "expectedResults": "",
+  "intellectualMerit": "",
+  "broaderImpacts": "",
+  "missingInformation": ["", ""],
+  "suggestedNextSteps": ["", ""]
+}
+
+Rules:
+- Generate a blueprint, not a final proposal draft.
+- Preserve the student's original intent and scope.
+- Do not invent fake citations, related work, or highly specific unsupported claims.
+- If information is missing, say so clearly in "missingInformation".
+- Keep the output useful for later critique, revision, related-work retrieval, and version tracking.
+- Research questions and hypotheses can be provisional, but they must stay grounded in the intake.
+- Return valid JSON only.`;
+
+const RELATED_WORK_SYSTEM_PROMPT = `You are a graduate research proposal assistant helping a student plan the related work section of a research proposal.
+
+Return strict JSON with this exact shape:
+{
+  "searchQueries": ["", ""],
+  "keyConcepts": ["", ""],
+  "relatedWorkBuckets": [
+    {
+      "title": "",
+      "description": "",
+      "whyItMatters": "",
+      "exampleSearchTerms": ["", ""]
+    }
+  ],
+  "suggestedVenuesOrSources": ["", ""],
+  "literatureGapQuestions": ["", ""],
+  "unsupportedClaimWarnings": ["", ""],
+  "nextSteps": ["", ""]
+}
+
+Rules:
+- Generate literature search directions, not verified citations.
+- Do not invent paper titles, authors, venues, publication years, or novelty claims.
+- Use the student's intake and proposal blueprint to identify research areas, search terms, and gap-finding questions.
+- Make unsupported-claim risks explicit.
+- Keep the result useful for later paper retrieval, critique, revision, and version tracking.
+- Return valid JSON only.`;
+
 export async function startAgentSession(payload) {
   const project = normalizePayload(payload);
   const checklist = extractChecklist(project.requirements || DEFAULT_REQUIREMENTS);
@@ -193,6 +252,50 @@ export async function answerAgentQuestion(payload) {
   };
 }
 
+export async function generateProposalBlueprint(payload) {
+  const ideaInput = normalizeIdeaInputPayload(payload.ideaInput || payload);
+  const ideaPreview = normalizeIdeaPreviewPayload(payload.ideaPreview || {});
+
+  if (process.env.LLM_API_KEY && process.env.LLM_API_URL) {
+    try {
+      return await generateBlueprintWithApi(ideaInput, ideaPreview);
+    } catch (error) {
+      const fallback = generateBlueprintLocally(ideaInput, ideaPreview);
+      return {
+        ...fallback,
+        transcript: {
+          ...fallback.transcript,
+          rawResponse: `API blueprint generation failed and fell back to template mode.\n${error instanceof Error ? error.message : String(error)}`
+        }
+      };
+    }
+  }
+
+  return generateBlueprintLocally(ideaInput, ideaPreview);
+}
+
+export async function generateRelatedWorkPlan(payload) {
+  const ideaInput = normalizeIdeaInputPayload(payload.ideaInput || payload);
+  const proposalBlueprint = normalizeProposalBlueprintPayload(payload.proposalBlueprint || payload.blueprint || {}, ideaInput);
+
+  if (process.env.LLM_API_KEY && process.env.LLM_API_URL) {
+    try {
+      return await generateRelatedWorkWithApi(ideaInput, proposalBlueprint);
+    } catch (error) {
+      const fallback = generateRelatedWorkLocally(ideaInput, proposalBlueprint);
+      return {
+        ...fallback,
+        transcript: {
+          ...fallback.transcript,
+          rawResponse: `API related-work generation failed and fell back to template mode.\n${error instanceof Error ? error.message : String(error)}`
+        }
+      };
+    }
+  }
+
+  return generateRelatedWorkLocally(ideaInput, proposalBlueprint);
+}
+
 export async function generateProposal(payload) {
   const project = normalizePayload(payload);
   const requirements = project.requirements || DEFAULT_REQUIREMENTS;
@@ -270,6 +373,95 @@ async function generateWithApi(project, checklist) {
     mode: 'api',
     provider: process.env.LLM_API_URL,
     ...coerceResult(parsed, project, checklist),
+    transcript: {
+      prompt: promptPayload,
+      rawResponse: content
+    }
+  };
+}
+
+async function generateBlueprintWithApi(ideaInput, ideaPreview) {
+  const model = clean(process.env.LLM_MODEL);
+
+  if (!model) {
+    throw new Error('LLM_MODEL is required when LLM_API_KEY and LLM_API_URL are configured.');
+  }
+
+  const promptPayload = {
+    ideaInput,
+    ideaPreview,
+    outputContract: {
+      workingTitle: 'Working proposal title',
+      oneSentenceSummary: 'One-sentence proposal summary',
+      problemStatement: 'Clear problem statement',
+      motivation: 'Why the problem matters',
+      researchGap: 'Gap or opening in current support or knowledge',
+      proposedContribution: 'What this project will contribute',
+      researchQuestions: 'Array of research questions',
+      hypotheses: 'Array of hypotheses',
+      proposedMethod: 'Method or technical approach',
+      datasetsToolsSystems: 'Possible datasets, tools, or systems',
+      evaluationPlan: 'How the student might evaluate success',
+      expectedResults: 'Expected outcome of the work',
+      intellectualMerit: 'Research merit and novelty',
+      broaderImpacts: 'Who benefits and why it matters',
+      missingInformation: 'Array of open questions or missing details',
+      suggestedNextSteps: 'Array of next actions for later workflow stages'
+    }
+  };
+
+  const content = await callModel({
+    systemPrompt: BLUEPRINT_SYSTEM_PROMPT,
+    payload: promptPayload,
+    model,
+    temperature: 0.2
+  });
+  const parsed = parseJsonContent(content);
+
+  return {
+    mode: 'api',
+    provider: process.env.LLM_API_URL,
+    blueprint: coerceBlueprintResult(parsed, ideaInput, ideaPreview),
+    transcript: {
+      prompt: promptPayload,
+      rawResponse: content
+    }
+  };
+}
+
+async function generateRelatedWorkWithApi(ideaInput, proposalBlueprint) {
+  const model = clean(process.env.LLM_MODEL);
+
+  if (!model) {
+    throw new Error('LLM_MODEL is required when LLM_API_KEY and LLM_API_URL are configured.');
+  }
+
+  const promptPayload = {
+    ideaInput,
+    proposalBlueprint,
+    outputContract: {
+      searchQueries: 'Array of suggested literature search queries',
+      keyConcepts: 'Array of research concepts or keywords',
+      relatedWorkBuckets: 'Array of related-work category objects',
+      suggestedVenuesOrSources: 'Array of likely places or source types to search',
+      literatureGapQuestions: 'Array of questions to investigate in the literature',
+      unsupportedClaimWarnings: 'Array of warning statements about claims needing evidence',
+      nextSteps: 'Array of follow-up literature review actions'
+    }
+  };
+
+  const content = await callModel({
+    systemPrompt: RELATED_WORK_SYSTEM_PROMPT,
+    payload: promptPayload,
+    model,
+    temperature: 0.2
+  });
+  const parsed = parseJsonContent(content);
+
+  return {
+    mode: 'api',
+    provider: process.env.LLM_API_URL,
+    relatedWorkPlan: coerceRelatedWorkResult(parsed, ideaInput, proposalBlueprint),
     transcript: {
       prompt: promptPayload,
       rawResponse: content
@@ -395,6 +587,79 @@ ${questions.length ? questions.map((question) => `- ${question}`).join('\n') : '
       prompt: { project, checklist },
       rawResponse: 'Generated by local fallback because LLM_API_KEY or LLM_API_URL is not configured.'
     }
+  };
+}
+
+function generateBlueprintLocally(ideaInput, ideaPreview) {
+  return {
+    mode: 'template',
+    provider: 'template',
+    blueprint: buildLocalProposalBlueprint(ideaInput, ideaPreview),
+    transcript: {
+      prompt: { ideaInput, ideaPreview },
+      rawResponse: 'Generated by local fallback because LLM_API_KEY or LLM_API_URL is not configured.'
+    }
+  };
+}
+
+function generateRelatedWorkLocally(ideaInput, proposalBlueprint) {
+  return {
+    mode: 'template',
+    provider: 'template',
+    relatedWorkPlan: buildLocalRelatedWorkPlan(ideaInput, proposalBlueprint),
+    transcript: {
+      prompt: { ideaInput, proposalBlueprint },
+      rawResponse: 'Generated by local fallback because LLM_API_KEY or LLM_API_URL is not configured.'
+    }
+  };
+}
+
+function buildLocalProposalBlueprint(ideaInput, ideaPreview) {
+  const workingTitle = titleCase(ideaInput.topic || 'Research Proposal Blueprint');
+  const domainLabel = ideaInput.domain || 'the target research domain';
+  const contribution = clean(ideaInput.expectedContribution) || inferBlueprintContribution(ideaInput);
+  const method = clean(ideaInput.methods) || 'A staged proposal workflow that structures the idea, critiques missing pieces, and guides revision.';
+  const dataSystems = clean(ideaInput.datasets) || 'Candidate datasets, tools, and systems still need to be selected.';
+  const missingInformation = buildBlueprintMissingInformation(ideaInput, ideaPreview);
+
+  return {
+    workingTitle,
+    oneSentenceSummary: `${workingTitle} reframes ${ideaInput.problem || 'a rough student research idea'} into a structured proposal scaffold for ${domainLabel}.`,
+    problemStatement:
+      clean(ideaInput.problem) ||
+      'The core problem still needs to be written as a concrete research pain point with a clear user, context, and consequence.',
+    motivation:
+      mergeIdeaSegments([
+        clean(ideaInput.motivation),
+        clean(ideaInput.beneficiaries) ? `Primary beneficiaries: ${clean(ideaInput.beneficiaries)}` : ''
+      ]) || 'The proposal still needs a stronger explanation of why the problem matters and who benefits.',
+    researchGap: buildResearchGap(ideaInput),
+    proposedContribution: contribution,
+    researchQuestions: buildResearchQuestions(ideaInput),
+    hypotheses: buildHypotheses(ideaInput),
+    proposedMethod: method,
+    datasetsToolsSystems: dataSystems,
+    evaluationPlan: buildEvaluationPlan(ideaInput),
+    expectedResults: buildExpectedResults(ideaInput, contribution),
+    intellectualMerit: buildIntellectualMerit(ideaInput, contribution),
+    broaderImpacts: buildBroaderImpacts(ideaInput),
+    missingInformation,
+    suggestedNextSteps: buildSuggestedNextSteps(ideaInput, missingInformation)
+  };
+}
+
+function buildLocalRelatedWorkPlan(ideaInput, proposalBlueprint) {
+  const keyConcepts = buildRelatedWorkConcepts(ideaInput, proposalBlueprint);
+  const relatedWorkBuckets = buildRelatedWorkBuckets(ideaInput, proposalBlueprint, keyConcepts);
+
+  return {
+    searchQueries: buildSearchQueries(ideaInput, proposalBlueprint, keyConcepts),
+    keyConcepts,
+    relatedWorkBuckets,
+    suggestedVenuesOrSources: buildSuggestedVenuesOrSources(ideaInput),
+    literatureGapQuestions: buildLiteratureGapQuestions(ideaInput, proposalBlueprint),
+    unsupportedClaimWarnings: buildUnsupportedClaimWarnings(ideaInput, proposalBlueprint),
+    nextSteps: buildRelatedWorkNextSteps(proposalBlueprint, relatedWorkBuckets)
   };
 }
 
@@ -881,17 +1146,377 @@ function mergeField(current, addition) {
 }
 
 function normalizePayload(payload) {
+  const ideaInput = payload.ideaInput && typeof payload.ideaInput === 'object' ? payload.ideaInput : {};
+  const topic = clean(payload.topic) || clean(ideaInput.topic);
+  const title = clean(payload.title) || topic;
+  const problem = clean(payload.problem) || buildProblemFromIdeaInput(ideaInput);
+  const method = clean(payload.method) || buildMethodFromIdeaInput(ideaInput);
+  const resources = clean(payload.resources) || buildResourcesFromIdeaInput(ideaInput);
+  const references = clean(payload.references) || buildReferencesFromIdeaInput(ideaInput);
+
   return {
-    topic: clean(payload.topic),
-    title: clean(payload.title) || clean(payload.topic),
-    problem: clean(payload.problem),
-    method: clean(payload.method),
+    topic,
+    title,
+    problem,
+    method,
     timeline: clean(payload.timeline),
     evaluation: clean(payload.evaluation),
-    resources: clean(payload.resources),
-    references: clean(payload.references),
+    resources,
+    references,
     requirements: clean(payload.requirements) || DEFAULT_REQUIREMENTS
   };
+}
+
+function normalizeIdeaInputPayload(payload) {
+  return {
+    topic: clean(payload.topic),
+    domain: clean(payload.domain),
+    problem: clean(payload.problem),
+    motivation: clean(payload.motivation),
+    beneficiaries: clean(payload.beneficiaries),
+    keywords: clean(payload.keywords),
+    methods: clean(payload.methods),
+    datasets: clean(payload.datasets),
+    expectedContribution: clean(payload.expectedContribution),
+    uncertainties: clean(payload.uncertainties)
+  };
+}
+
+function normalizeIdeaPreviewPayload(payload) {
+  return {
+    detectedTopic: clean(payload.detectedTopic),
+    problem: clean(payload.problem),
+    motivation: clean(payload.motivation),
+    possibleContribution: clean(payload.possibleContribution),
+    missingInformation: Array.isArray(payload.missingInformation) ? payload.missingInformation.map(clean).filter(Boolean) : []
+  };
+}
+
+function normalizeProposalBlueprintPayload(payload, ideaInput) {
+  return coerceBlueprintResult(payload, ideaInput, normalizeIdeaPreviewPayload({}));
+}
+
+function buildProblemFromIdeaInput(ideaInput) {
+  return mergeIdeaSegments([
+    clean(ideaInput.problem),
+    clean(ideaInput.motivation) ? `Why it matters: ${clean(ideaInput.motivation)}` : '',
+    clean(ideaInput.beneficiaries) ? `Beneficiaries: ${clean(ideaInput.beneficiaries)}` : ''
+  ]);
+}
+
+function buildMethodFromIdeaInput(ideaInput) {
+  return mergeIdeaSegments([
+    clean(ideaInput.methods),
+    clean(ideaInput.expectedContribution) ? `Expected contribution: ${clean(ideaInput.expectedContribution)}` : '',
+    clean(ideaInput.uncertainties) ? `Open uncertainties: ${clean(ideaInput.uncertainties)}` : ''
+  ]);
+}
+
+function buildResourcesFromIdeaInput(ideaInput) {
+  return mergeIdeaSegments([clean(ideaInput.datasets)]);
+}
+
+function buildReferencesFromIdeaInput(ideaInput) {
+  return mergeIdeaSegments([clean(ideaInput.keywords)]);
+}
+
+function mergeIdeaSegments(parts) {
+  return parts.filter(Boolean).join('\n');
+}
+
+function inferBlueprintContribution(ideaInput) {
+  if (ideaInput.methods) {
+    return `A proposal blueprint that connects ${ideaInput.methods.toLowerCase()} to clearer research framing, evaluation planning, and later critique stages.`;
+  }
+
+  return `A stronger proposal scaffold for ${clean(ideaInput.topic).toLowerCase() || 'the proposed research idea'} with clearer scope, contribution, and revision targets.`;
+}
+
+function buildResearchGap(ideaInput) {
+  const domain = ideaInput.domain || 'this research area';
+  const keywords = ideaInput.keywords || 'existing proposal-writing or research-support approaches';
+
+  return `Current support in ${domain} does not yet clearly translate rough ideas around ${keywords} into structured proposal elements with explicit research gap, evaluation logic, and revision targets.`;
+}
+
+function buildResearchQuestions(ideaInput) {
+  const topic = ideaInput.topic || 'this proposal workflow';
+
+  return [
+    `How can ${topic} be structured into a proposal blueprint that preserves the student's intent while clarifying scope and contribution?`,
+    `What information is most important to surface early so later critique and revision stages can improve the proposal efficiently?`,
+    `How should the workflow evaluate whether the blueprint meaningfully improves the student's original rough idea?`
+  ];
+}
+
+function buildHypotheses(ideaInput) {
+  const beneficiaries = ideaInput.beneficiaries || 'students and reviewers';
+
+  return [
+    `A structured blueprint workflow will help ${beneficiaries} identify missing proposal components earlier than a free-form drafting approach.`,
+    'Making research gap, evaluation, and missing-information fields explicit will produce stronger proposal revisions in later workflow stages.'
+  ];
+}
+
+function buildEvaluationPlan(ideaInput) {
+  const method = clean(ideaInput.methods);
+
+  if (method) {
+    return `Evaluate the blueprint by comparing the original rough idea against the generated scaffold for clarity, section coverage, feasibility, and readiness for critique. Include at least one before/after example and check whether the proposed method (${method}) remains aligned with the original idea.`;
+  }
+
+  return 'Compare the rough idea against the generated blueprint for clarity, proposal-section coverage, specificity of research questions, and readiness for critique or revision.';
+}
+
+function buildExpectedResults(ideaInput, contribution) {
+  return `${contribution} The expected result is a blueprint that gives the student a clearer title, problem framing, research gap, method outline, and evaluation direction before full drafting begins.`;
+}
+
+function buildIntellectualMerit(ideaInput, contribution) {
+  const domain = ideaInput.domain || 'the target research domain';
+  return `The blueprint frames a credible research direction in ${domain} and sharpens the core contribution: ${contribution}`;
+}
+
+function buildBroaderImpacts(ideaInput) {
+  if (ideaInput.beneficiaries) {
+    return `The work could benefit ${ideaInput.beneficiaries} by making early-stage proposal development more structured, transparent, and easier to revise.`;
+  }
+
+  return 'The work could broaden access to stronger proposal development by helping students and advisors surface missing research logic earlier.';
+}
+
+function buildBlueprintMissingInformation(ideaInput, ideaPreview) {
+  const missing = [];
+
+  if (!ideaInput.keywords) missing.push('Add known papers, authors, or search keywords for the related-work stage.');
+  if (!ideaInput.datasets) missing.push('Identify datasets, tools, systems, or source materials that the method may rely on.');
+  if (!ideaInput.beneficiaries) missing.push('Clarify the primary user, stakeholder, or population that benefits from the work.');
+  if (!ideaInput.expectedContribution) missing.push('State the expected contribution in one concrete research sentence.');
+  if (ideaInput.uncertainties) missing.push(`Open uncertainties: ${ideaInput.uncertainties}`);
+
+  const previewMissing = Array.isArray(ideaPreview.missingInformation) ? ideaPreview.missingInformation : [];
+
+  return [...new Set([...missing, ...previewMissing].map(clean).filter(Boolean))].slice(0, 6);
+}
+
+function buildSuggestedNextSteps(ideaInput, missingInformation) {
+  const steps = [
+    'Review the blueprint and confirm that the proposed framing matches the original research intent.',
+    'Use the topic, keywords, and research gap to gather related work for the next workflow stage.',
+    'Strengthen the evaluation plan with concrete comparison criteria or success metrics.',
+    'Run a critique pass focused on scope, novelty, and missing evidence before drafting a full proposal.'
+  ];
+
+  if (!ideaInput.datasets) {
+    steps.splice(2, 0, 'Choose candidate datasets, tools, or systems so the proposed method becomes more concrete.');
+  }
+
+  if (missingInformation.length) {
+    steps.push('Resolve the missing-information list before treating this blueprint as a stable proposal version.');
+  }
+
+  return steps.slice(0, 6);
+}
+
+function buildRelatedWorkConcepts(ideaInput, proposalBlueprint) {
+  const seeded = [
+    ideaInput.topic,
+    ideaInput.domain,
+    ideaInput.keywords,
+    ideaInput.methods,
+    ideaInput.datasets,
+    ideaInput.expectedContribution,
+    proposalBlueprint.researchGap,
+    ...(proposalBlueprint.researchQuestions || []),
+    ...(proposalBlueprint.hypotheses || [])
+  ];
+
+  return dedupeStrings(
+    seeded
+      .flatMap(splitKeywords)
+      .filter((value) => value.length > 2)
+      .slice(0, 12)
+  );
+}
+
+function buildSearchQueries(ideaInput, proposalBlueprint, keyConcepts) {
+  const topic = clean(ideaInput.topic) || clean(proposalBlueprint.workingTitle) || 'research proposal workflow';
+  const method = clean(ideaInput.methods) || clean(proposalBlueprint.proposedMethod);
+  const evaluation = clean(proposalBlueprint.evaluationPlan);
+  const domain = clean(ideaInput.domain);
+  const gapFocus = findGapFocus(proposalBlueprint.researchGap);
+  const conceptA = keyConcepts[0] || topic;
+  const conceptB = keyConcepts[1] || domain || 'evaluation';
+  const conceptC = keyConcepts[2] || 'literature review';
+
+  const queries = [
+    joinQueryParts([topic, domain, 'related work']),
+    joinQueryParts([conceptA, conceptB, 'survey']),
+    joinQueryParts([topic, method, 'evaluation']),
+    joinQueryParts([conceptA, conceptC, gapFocus]),
+    joinQueryParts([domain, proposalBlueprint.proposedContribution, 'benchmark']),
+    joinQueryParts([topic, 'critique', 'revision', 'research proposal']),
+    joinQueryParts([conceptA, 'baseline comparison']),
+    joinQueryParts([conceptB, evaluation, 'evidence'])
+  ];
+
+  return dedupeStrings(queries.map(clean).filter(Boolean)).slice(0, 8);
+}
+
+function buildRelatedWorkBuckets(ideaInput, proposalBlueprint, keyConcepts) {
+  const domain = clean(ideaInput.domain) || 'the target domain';
+  const method = clean(ideaInput.methods) || clean(proposalBlueprint.proposedMethod);
+  const datasets = clean(ideaInput.datasets) || clean(proposalBlueprint.datasetsToolsSystems);
+
+  const buckets = [
+    {
+      title: `Problem framing in ${domain}`,
+      description: `Search for papers that define the core problem, target users, and existing failure modes related to ${clean(ideaInput.problem) || clean(ideaInput.topic) || 'this proposal area'}.`,
+      whyItMatters: 'This bucket helps justify that the proposal addresses a real research need rather than an assumed pain point.',
+      exampleSearchTerms: dedupeStrings([keyConcepts[0], keyConcepts[1], domain, 'problem framing']).slice(0, 4)
+    },
+    {
+      title: 'Methods and workflow approaches',
+      description: `Look for prior systems, agent workflows, or technical methods adjacent to ${method || 'the proposed approach'}.`,
+      whyItMatters: 'This bucket identifies what technical patterns already exist and where the proposal differs or extends prior work.',
+      exampleSearchTerms: dedupeStrings(splitKeywords(method).concat(['workflow', 'method', clean(ideaInput.topic)])).slice(0, 4)
+    },
+    {
+      title: 'Evaluation and benchmark design',
+      description: `Gather work that evaluates similar systems, including metrics, baselines, rubrics, user studies, or benchmark datasets connected to ${clean(proposalBlueprint.evaluationPlan) || clean(ideaInput.topic) || 'the proposal'}.`,
+      whyItMatters: 'This bucket helps the proposal avoid vague success claims and borrow credible evaluation patterns.',
+      exampleSearchTerms: dedupeStrings(splitKeywords(proposalBlueprint.evaluationPlan).concat(['evaluation', 'benchmark', 'baseline'])).slice(0, 4)
+    },
+    {
+      title: 'Adjacent contribution claims',
+      description: `Search for work that makes contribution claims similar to ${clean(proposalBlueprint.proposedContribution) || clean(ideaInput.expectedContribution) || 'the proposed system'} so novelty is assessed against real literature rather than intuition.`,
+      whyItMatters: 'This bucket reduces the risk of unsupported novelty claims and clarifies what the proposal actually adds.',
+      exampleSearchTerms: dedupeStrings(splitKeywords(proposalBlueprint.proposedContribution).concat(['novelty', 'comparison', 'related work'])).slice(0, 4)
+    }
+  ];
+
+  if (datasets) {
+    buckets.push({
+      title: 'Datasets, tools, and source materials',
+      description: `Review papers, systems, or reports that use ${datasets} or closely related resources.`,
+      whyItMatters: 'This bucket anchors the method in real data sources, tooling constraints, and reproducibility expectations.',
+      exampleSearchTerms: dedupeStrings(splitKeywords(datasets).concat(['dataset', 'tool', 'system'])).slice(0, 4)
+    });
+  }
+
+  return buckets.slice(0, 5).map((bucket) => ({
+    ...bucket,
+    exampleSearchTerms: bucket.exampleSearchTerms.length ? bucket.exampleSearchTerms : keyConcepts.slice(0, 4)
+  }));
+}
+
+function buildSuggestedVenuesOrSources(ideaInput) {
+  const domain = clean(ideaInput.domain).toLowerCase();
+  const venues = ['Survey papers and literature reviews', 'Semantic Scholar keyword search', 'Google Scholar keyword search', 'arXiv for recent preprints'];
+
+  if (/human-ai|hci|interaction|user/.test(domain)) {
+    venues.push('CHI, CSCW, and IUI venue families');
+  }
+
+  if (/nlp|language|llm|natural language/.test(domain)) {
+    venues.push('ACL, EMNLP, NAACL, and Findings venue families');
+  }
+
+  if (/machine learning|deep learning|ai|reasoning/.test(domain)) {
+    venues.push('NeurIPS, ICML, and ICLR venue families');
+  }
+
+  if (/education|learning|student|teaching/.test(domain)) {
+    venues.push('LAK, EDM, and AIED venue families');
+  }
+
+  venues.push('Course examples, proposal guides, and annotated proposal samples for structure-only support');
+
+  return dedupeStrings(venues).slice(0, 8);
+}
+
+function buildLiteratureGapQuestions(ideaInput, proposalBlueprint) {
+  const topic = clean(ideaInput.topic) || 'this proposal';
+  const method = clean(proposalBlueprint.proposedMethod) || clean(ideaInput.methods) || 'the proposed method';
+  const evaluation = clean(proposalBlueprint.evaluationPlan) || 'the proposed evaluation plan';
+
+  return dedupeStrings([
+    `What prior work already addresses problems close to ${topic}, and where does the proposal still differ?`,
+    `Do existing methods similar to ${method} already solve part of the problem or require stronger resources than this project assumes?`,
+    `How do prior papers evaluate systems like this, and does ${evaluation} align with those precedents?`,
+    'Where does the literature disagree on the best framing, metric, or baseline for this kind of problem?',
+    'Which proposal claims would remain weak unless grounded by survey papers, benchmark papers, or user-study evidence?'
+  ]).slice(0, 6);
+}
+
+function buildUnsupportedClaimWarnings(ideaInput, proposalBlueprint) {
+  const warnings = [
+    'Do not claim novelty until related work is retrieved and compared against the proposal contribution.',
+    'Do not cite specific papers, authors, or venues as evidence until the sources are actually found and verified.',
+    'Do not claim improvement over baselines until the evaluation plan, metrics, and comparison targets are defined.'
+  ];
+
+  if (!clean(ideaInput.datasets) && !clean(proposalBlueprint.datasetsToolsSystems)) {
+    warnings.push('Avoid claims about feasibility or reproducibility until candidate datasets, tools, or systems are identified.');
+  }
+
+  if (proposalBlueprint.missingInformation?.length) {
+    warnings.push('Treat open blueprint gaps as unresolved assumptions that still need literature support or clarification.');
+  }
+
+  return warnings.slice(0, 6);
+}
+
+function buildRelatedWorkNextSteps(proposalBlueprint, relatedWorkBuckets) {
+  return [
+    'Run each search query in a real academic search tool and save the most relevant papers by bucket.',
+    'Find at least one survey, one methods paper, and one evaluation or benchmark paper for the top buckets.',
+    'Map retrieved sources back to the proposal problem statement, research gap, and evaluation plan.',
+    'Revise any contribution or novelty language that the literature does not support.',
+    relatedWorkBuckets.length > 3
+      ? 'Prioritize the first three buckets for the Stage 1 demo so the literature plan stays focused.'
+      : 'Prioritize the strongest bucket first so the literature review begins with the clearest evidence need.'
+  ].slice(0, 6);
+}
+
+function splitKeywords(value) {
+  return clean(value)
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .flatMap((item) => item.split(/\s{2,}/))
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function dedupeStrings(values) {
+  const seen = new Set();
+
+  return values.filter((value) => {
+    const cleaned = clean(value);
+    if (!cleaned) return false;
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function joinQueryParts(parts) {
+  return parts
+    .map(clean)
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function findGapFocus(researchGap) {
+  const gap = clean(researchGap).toLowerCase();
+
+  if (gap.includes('evaluation')) return 'evaluation gap';
+  if (gap.includes('revision')) return 'revision workflow';
+  if (gap.includes('literature')) return 'literature review';
+  return 'research gap';
 }
 
 function extractChecklist(requirements) {
@@ -979,6 +1604,56 @@ function coerceResult(result, project, checklist) {
   };
 }
 
+function coerceBlueprintResult(result, ideaInput, ideaPreview) {
+  const fallback = buildLocalProposalBlueprint(ideaInput, ideaPreview);
+
+  return {
+    workingTitle: readFirstString(result, ['workingTitle', 'working_title']) || fallback.workingTitle,
+    oneSentenceSummary: readFirstString(result, ['oneSentenceSummary', 'one_sentence_summary']) || fallback.oneSentenceSummary,
+    problemStatement: readFirstString(result, ['problemStatement', 'problem_statement']) || fallback.problemStatement,
+    motivation: readFirstString(result, ['motivation']) || fallback.motivation,
+    researchGap: readFirstString(result, ['researchGap', 'research_gap']) || fallback.researchGap,
+    proposedContribution: readFirstString(result, ['proposedContribution', 'proposed_contribution']) || fallback.proposedContribution,
+    researchQuestions: readStringArray(result, ['researchQuestions', 'research_questions'], fallback.researchQuestions),
+    hypotheses: readStringArray(result, ['hypotheses'], fallback.hypotheses),
+    proposedMethod: readFirstString(result, ['proposedMethod', 'proposed_method']) || fallback.proposedMethod,
+    datasetsToolsSystems:
+      readFirstString(result, ['datasetsToolsSystems', 'datasets_tools_systems', 'datasetsTools']) || fallback.datasetsToolsSystems,
+    evaluationPlan: readFirstString(result, ['evaluationPlan', 'evaluation_plan']) || fallback.evaluationPlan,
+    expectedResults: readFirstString(result, ['expectedResults', 'expected_results']) || fallback.expectedResults,
+    intellectualMerit: readFirstString(result, ['intellectualMerit', 'intellectual_merit']) || fallback.intellectualMerit,
+    broaderImpacts: readFirstString(result, ['broaderImpacts', 'broader_impacts']) || fallback.broaderImpacts,
+    missingInformation: readStringArray(result, ['missingInformation', 'missing_information'], fallback.missingInformation),
+    suggestedNextSteps: readStringArray(result, ['suggestedNextSteps', 'suggested_next_steps'], fallback.suggestedNextSteps)
+  };
+}
+
+function coerceRelatedWorkResult(result, ideaInput, proposalBlueprint) {
+  const fallback = buildLocalRelatedWorkPlan(ideaInput, proposalBlueprint);
+
+  return {
+    searchQueries: readStringArray(result, ['searchQueries', 'search_queries'], fallback.searchQueries),
+    keyConcepts: readStringArray(result, ['keyConcepts', 'key_concepts'], fallback.keyConcepts),
+    relatedWorkBuckets: readBucketArray(result, ['relatedWorkBuckets', 'related_work_buckets'], fallback.relatedWorkBuckets),
+    suggestedVenuesOrSources: readStringArray(
+      result,
+      ['suggestedVenuesOrSources', 'suggested_venues_or_sources'],
+      fallback.suggestedVenuesOrSources
+    ),
+    literatureGapQuestions: readStringArray(
+      result,
+      ['literatureGapQuestions', 'literature_gap_questions'],
+      fallback.literatureGapQuestions
+    ),
+    unsupportedClaimWarnings: readStringArray(
+      result,
+      ['unsupportedClaimWarnings', 'unsupported_claim_warnings'],
+      fallback.unsupportedClaimWarnings
+    ),
+    nextSteps: readStringArray(result, ['nextSteps', 'suggestedNextSteps', 'next_steps'], fallback.nextSteps)
+  };
+}
+
 function extractProposalLatex(result, project) {
   const candidates = [
     result?.proposalLatex,
@@ -1037,6 +1712,65 @@ function stripCodeFence(value) {
   const trimmed = clean(value);
   const fenced = trimmed.match(/```(?:latex|tex)?\s*([\s\S]*?)```/i);
   return fenced?.[1]?.trim() || trimmed;
+}
+
+function readFirstString(result, keys) {
+  for (const key of keys) {
+    const value = clean(result?.[key]);
+    if (value) return value;
+  }
+
+  return '';
+}
+
+function readStringArray(result, keys, fallback) {
+  for (const key of keys) {
+    const value = result?.[key];
+
+    if (Array.isArray(value)) {
+      const cleaned = value.map(clean).filter(Boolean);
+      if (cleaned.length) return cleaned;
+    }
+
+    if (typeof value === 'string' && clean(value)) {
+      return [clean(value)];
+    }
+  }
+
+  return fallback;
+}
+
+function readBucketArray(result, keys, fallback) {
+  for (const key of keys) {
+    const value = result?.[key];
+
+    if (!Array.isArray(value)) continue;
+
+    const buckets = value
+      .map((entry) => ({
+        title: clean(entry?.title),
+        description: clean(entry?.description),
+        whyItMatters: clean(entry?.whyItMatters || entry?.why_it_matters),
+        exampleSearchTerms: Array.isArray(entry?.exampleSearchTerms || entry?.example_search_terms)
+          ? (entry.exampleSearchTerms || entry.example_search_terms).map(clean).filter(Boolean)
+          : typeof (entry?.exampleSearchTerms || entry?.example_search_terms) === 'string'
+            ? [clean(entry.exampleSearchTerms || entry.example_search_terms)]
+            : []
+      }))
+      .filter((entry) => entry.title && entry.description);
+
+    if (buckets.length) {
+      return buckets.map((bucket, index) => ({
+        ...bucket,
+        whyItMatters: bucket.whyItMatters || fallback[index]?.whyItMatters || 'This bucket helps position the proposal against existing work.',
+        exampleSearchTerms: bucket.exampleSearchTerms.length
+          ? bucket.exampleSearchTerms
+          : fallback[index]?.exampleSearchTerms || []
+      }));
+    }
+  }
+
+  return fallback;
 }
 
 function isSpecific(value, length) {
