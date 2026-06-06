@@ -8,6 +8,8 @@ function ApplyRevisionsPanel({
   applyRevisionsMode,
   applyRevisionsStatus,
   currentVersionId,
+  draftComparisonVersions,
+  draftVersionComparison,
   onApply,
   onGenerateProposalOutput,
   onSelectVersionComparison,
@@ -22,11 +24,11 @@ function ApplyRevisionsPanel({
 }) {
   const acceptedCount = revisionPlan?.acceptedSuggestions?.length || 0;
   const hasVersions = proposalVersions.length > 0;
-  const hasComparison = Boolean(versionComparison);
+  const hasDraftComparison = Boolean(draftVersionComparison);
   const modeLabel = applyRevisionsMode === 'api' ? 'Gemini' : applyRevisionsMode === 'template' ? 'Template' : 'Waiting';
-  const latestVersion = proposalVersions[proposalVersions.length - 1] || null;
+  const latestPreviewVersion = draftComparisonVersions.at(-1) || null;
   const readyForNextStep =
-    hasComparison &&
+    hasDraftComparison &&
     !revisionApplicationStale &&
     applyRevisionsStatus !== 'applying' &&
     proposalOutputStatus !== 'generating';
@@ -36,10 +38,9 @@ function ApplyRevisionsPanel({
       <div className="panel-header-row">
         <div>
           <span className="eyebrow">Step 6</span>
-          <h2>Apply Revisions &amp; Version History</h2>
+          <h2>Apply Revisions &amp; Draft Comparison</h2>
           <p>
-            This step applies only the suggestions you accepted and saves a before/after version so you can track proposal
-            improvement.
+            This step applies only the suggestions you accepted and previews the before/after draft changes before Step 7 saves a new finalized version.
           </p>
         </div>
         <span className={applyRevisionsMode ? 'mode-pill is-ready' : 'mode-pill'}>{modeLabel}</span>
@@ -77,8 +78,7 @@ function ApplyRevisionsPanel({
 
       {revisionApplicationStale ? (
         <div className="stale-banner">
-          Accepted suggestions changed after the latest revised blueprint was saved. Apply revisions again to create a fresh
-          before/after version pair.
+          Accepted suggestions changed after the latest draft was applied. Apply revisions again before Step 7 can save a new finalized version.
         </div>
       ) : null}
 
@@ -97,7 +97,7 @@ function ApplyRevisionsPanel({
         <div className="blueprint-empty-state">
           <Loader2 className="spin" size={28} aria-hidden="true" />
           <h3>Applying accepted revisions</h3>
-          <p>The proposal blueprint is being revised from the student-approved suggestions and saved into version history.</p>
+          <p>The proposal blueprint is being revised from the student-approved suggestions and prepared for final proposal generation.</p>
         </div>
       ) : null}
 
@@ -105,20 +105,20 @@ function ApplyRevisionsPanel({
         <div className="blueprint-empty-state">
           <History size={28} aria-hidden="true" />
           <h3>Revision application pending</h3>
-          <p>Apply the accepted suggestions to save the initial and revised blueprint versions for before/after comparison.</p>
+          <p>Apply the accepted suggestions to preview the revised draft. The final version history entry will be saved in Step 7.</p>
         </div>
       ) : null}
 
-      {hasVersions ? (
+      {hasDraftComparison || hasVersions ? (
         <>
           <div className="blueprint-meta-row">
             <span>
               <History size={16} aria-hidden="true" />
-              {applyRevisionsGeneratedAt ? `Latest revision saved ${formatSavedAt(applyRevisionsGeneratedAt)}` : 'Versions saved recently'}
+              {applyRevisionsGeneratedAt ? `Latest draft applied ${formatSavedAt(applyRevisionsGeneratedAt)}` : 'Draft comparison prepared recently'}
             </span>
             <span>
               <GitCompareArrows size={16} aria-hidden="true" />
-              {revisionApplicationStale ? 'Apply the latest accepted plan again before using this comparison' : 'Before/after comparison is ready'}
+              {revisionApplicationStale ? 'Re-apply the latest accepted plan before using this comparison' : 'Before/after draft comparison is ready'}
             </span>
           </div>
 
@@ -128,9 +128,9 @@ function ApplyRevisionsPanel({
                 <Sparkles size={16} aria-hidden="true" />
                 <span>Change Summary</span>
               </div>
-              {latestVersion?.changeSummary?.length ? (
+              {latestPreviewVersion?.changeSummary?.length ? (
                 <ul className="blueprint-list checklist-list is-checklist">
-                  {latestVersion.changeSummary.map((item) => (
+                  {latestPreviewVersion.changeSummary.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
                 </ul>
@@ -164,7 +164,11 @@ function ApplyRevisionsPanel({
               selectedComparison={selectedComparison}
             />
 
-            <VersionComparisonPanel proposalVersions={proposalVersions} versionComparison={versionComparison} />
+            <VersionComparisonPanel
+              emptyMessage="Apply accepted revisions to generate a draft before/after comparison."
+              proposalVersions={draftComparisonVersions}
+              versionComparison={draftVersionComparison || versionComparison}
+            />
           </div>
         </>
       ) : null}

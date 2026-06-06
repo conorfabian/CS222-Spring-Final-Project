@@ -243,6 +243,7 @@ p {
 }
 
 .workflow-step {
+  width: 100%;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 12px;
@@ -250,9 +251,24 @@ p {
   border-radius: 20px;
   background: rgba(248, 244, 235, 0.58);
   border: 1px solid transparent;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    opacity 140ms ease;
 }
 
-.workflow-step.is-active {
+.workflow-step:hover:not(:disabled),
+.workflow-step:focus-visible {
+  border-color: rgba(17, 63, 103, 0.18);
+  box-shadow: 0 0 0 4px rgba(17, 63, 103, 0.08);
+  outline: none;
+}
+
+.workflow-step.is-selected {
   border-color: rgba(17, 63, 103, 0.18);
   background: linear-gradient(135deg, rgba(18, 61, 99, 0.9), rgba(21, 90, 74, 0.9));
   color: #f8f4eb;
@@ -264,13 +280,24 @@ p {
   background: rgba(229, 244, 239, 0.9);
 }
 
-.workflow-step.is-next {
+.workflow-step.is-available {
   border-color: rgba(199, 136, 45, 0.18);
   background: rgba(247, 239, 223, 0.9);
 }
 
-.workflow-step.is-upcoming {
+.workflow-step.is-stale {
+  border-color: rgba(181, 108, 31, 0.2);
+  background: rgba(255, 244, 228, 0.94);
+}
+
+.workflow-step.is-locked {
   opacity: 0.9;
+  cursor: not-allowed;
+  background: rgba(240, 238, 234, 0.92);
+}
+
+.workflow-step:disabled {
+  color: inherit;
 }
 
 .step-marker {
@@ -296,7 +323,7 @@ p {
   color: #1d4f7f;
 }
 
-.workflow-step.is-active .step-icon {
+.workflow-step.is-selected .step-icon {
   background: rgba(255, 255, 255, 0.16);
   color: #f8f4eb;
 }
@@ -304,6 +331,16 @@ p {
 .workflow-step.is-complete .step-icon {
   background: rgba(255, 255, 255, 0.82);
   color: #245546;
+}
+
+.workflow-step.is-stale .step-icon {
+  background: rgba(255, 255, 255, 0.84);
+  color: #9a5b18;
+}
+
+.workflow-step.is-locked .step-icon {
+  background: rgba(255, 255, 255, 0.82);
+  color: #56636f;
 }
 
 .step-content {
@@ -339,13 +376,17 @@ p {
   color: #2f556e;
 }
 
-.workflow-step.is-active .step-status {
+.workflow-step.is-selected .step-status {
   background: rgba(255, 255, 255, 0.18);
   color: #fff6e5;
 }
 
 .workflow-step.is-complete .step-status {
   color: #245546;
+}
+
+.workflow-step.is-stale .step-status {
+  color: #9a5b18;
 }
 
 .studio-main {

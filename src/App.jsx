@@ -115,6 +115,7 @@ function App() {
   const [errors, setErrors] = useState({});
   const [intakeStatus, setIntakeStatus] = useState('idle');
   const [proposalBlueprint, setProposalBlueprint] = useState(null);
+  const [currentDraftBlueprint, setCurrentDraftBlueprint] = useState(null);
   const [blueprintMode, setBlueprintMode] = useState(null);
   const [blueprintStatus, setBlueprintStatus] = useState('idle');
   const [blueprintError, setBlueprintError] = useState('');
@@ -136,6 +137,7 @@ function App() {
   const [revisionPlan, setRevisionPlan] = useState(null);
   const [revisionPlanStale, setRevisionPlanStale] = useState(false);
   const [revisionPlanUpdatedAt, setRevisionPlanUpdatedAt] = useState('');
+  const [revisionPreview, setRevisionPreview] = useState(null);
   const [proposalVersions, setProposalVersions] = useState([]);
   const [currentVersionId, setCurrentVersionId] = useState('');
   const [versionComparison, setVersionComparison] = useState(null);
@@ -185,7 +187,7 @@ function App() {
       steps.add('revision-planning');
     }
 
-    if (proposalVersions.length >= 2) {
+    if (revisionPreview?.afterVersion) {
       steps.add('apply-revisions');
     }
 
@@ -199,11 +201,42 @@ function App() {
     ideaPreview,
     proposalBlueprint,
     proposalOutput,
+    revisionPreview,
     relatedWorkPlan,
     revisionSuggestions,
     revisionPlan,
     proposalVersions.length
   ]);
+
+  const stepMetaById = useMemo(
+    () =>
+      buildStepMeta({
+        activeStep,
+        completedSteps,
+        staleSteps: {
+          'idea-intake': isEditingIdea && Boolean(ideaPreview),
+          'proposal-blueprint': blueprintStale,
+          'related-work': relatedWorkStale,
+          'multi-agent-critique': critiqueStale,
+          'revision-planning': revisionPlanStale || critiqueStale,
+          'apply-revisions': revisionApplicationStale,
+          'proposal-output': proposalOutputStale
+        },
+        steps: WORKFLOW_STEPS
+      }),
+    [
+      activeStep,
+      blueprintStale,
+      completedSteps,
+      critiqueStale,
+      ideaPreview,
+      isEditingIdea,
+      proposalOutputStale,
+      relatedWorkStale,
+      revisionApplicationStale,
+      revisionPlanStale
+    ]
+  );
 
   const currentStepNumber = useMemo(() => {
     const index = WORKFLOW_STEPS.findIndex((step) => step.id === activeStep);
@@ -227,6 +260,7 @@ function App() {
       setAnalysisMode(snapshot.analysisMode || null);
       setLastAnalyzedAt(snapshot.lastAnalyzedAt || '');
       setProposalBlueprint(snapshot.proposalBlueprint || null);
+      setCurrentDraftBlueprint(null);
       setBlueprintMode(snapshot.blueprintMode || null);
       setBlueprintGeneratedAt(snapshot.blueprintGeneratedAt || '');
       setBlueprintStale(Boolean(snapshot.blueprintStale));
@@ -242,6 +276,7 @@ function App() {
       setRevisionPlan(snapshot.revisionPlan || null);
       setRevisionPlanStale(Boolean(snapshot.revisionPlanStale));
       setRevisionPlanUpdatedAt(snapshot.revisionPlanUpdatedAt || '');
+      setRevisionPreview(null);
       setProposalVersions(Array.isArray(snapshot.proposalVersions) ? snapshot.proposalVersions : []);
       setCurrentVersionId(snapshot.currentVersionId || '');
       setVersionComparison(snapshot.versionComparison || null);
@@ -333,6 +368,7 @@ function App() {
     critiqueGeneratedAt,
     critiqueMode,
     critiquePanelResult,
+    currentDraftBlueprint,
     critiqueStale,
     ideaInput,
     ideaPreview,
@@ -384,7 +420,7 @@ function App() {
       try {
         const pdfBlob = await postBinary('/api/export/pdf', {
           proposalLatex: proposalOutput.proposalLatex,
-          title: proposalOutput.title || proposalBlueprint?.workingTitle || ideaInput.topic || 'proposal'
+          title: proposalOutput.title || currentDraftBlueprint?.workingTitle || proposalBlueprint?.workingTitle || ideaInput.topic || 'proposal'
         });
 
         if (cancelled) return;
@@ -407,7 +443,27 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [ideaInput.topic, memoryReady, proposalBlueprint, proposalOutput, proposalOutputError, proposalOutputStatus, proposalPdfUrl]);
+  }, [currentDraftBlueprint, ideaInput.topic, memoryReady, proposalBlueprint, proposalOutput, proposalOutputError, proposalOutputStatus, proposalPdfUrl]);
+
+  useEffect(() => {
+    const currentStepMeta = stepMetaById[activeStep];
+
+    if (!currentStepMeta?.isSelectable) {
+      setActiveStep(findFallbackStep(stepMetaById));
+    }
+  }, [activeStep, stepMetaById]);
+
+  function handleSelectStep(stepId) {
+    const targetMeta = stepMetaById[stepId];
+
+    if (!targetMeta?.isSelectable) {
+      setNotice(buildLockedStepMessage(stepId, stepMetaById));
+      return;
+    }
+
+    setActiveStep(stepId);
+    setIsEditingIdea(stepId === 'idea-intake' ? isEditingIdea : false);
+  }
 
   function handleFieldChange(field, value) {
     setIdeaInput((current) => ({
@@ -423,51 +479,15 @@ function App() {
       });
     }
 
-    const hasBlueprint = Boolean(proposalBlueprint);
-    const hasRelatedWork = Boolean(relatedWorkPlan);
-    const hasCritique = Boolean(critiquePanelResult);
-    const hasRevisionPlanning = Boolean(revisionSuggestions.length || revisionPlan);
-    const hasRevisionApplication = Boolean(proposalVersions.length || versionComparison);
-    const hasProposalOutput = Boolean(proposalOutput);
-
-    if (hasBlueprint && !blueprintStale) {
+    if (proposalBlueprint) {
       setBlueprintStale(true);
-    }
-
-    if (hasRelatedWork && !relatedWorkStale) {
-      setRelatedWorkStale(true);
-    }
-
-    if (hasCritique && !critiqueStale) {
-      setCritiqueStale(true);
-    }
-
-    if (hasRevisionPlanning && !revisionPlanStale) {
-      setRevisionPlanStale(true);
-    }
-
-    if (hasRevisionApplication && !revisionApplicationStale) {
-      setRevisionApplicationStale(true);
-    }
-
-    if (hasProposalOutput && !proposalOutputStale) {
-      setProposalOutputStale(true);
-    }
-
-    if (hasBlueprint || hasRelatedWork || hasCritique || hasRevisionPlanning || hasRevisionApplication || hasProposalOutput) {
-      setNotice(
-        hasProposalOutput
-          ? 'Step 1 changed. Regenerate the proposal blueprint, related work plan, critique, revision plan, revised version, and final proposal output before using later workflow stages.'
-          : hasRevisionApplication
-            ? 'Step 1 changed. Regenerate the proposal blueprint, related work plan, critique, revision plan, and revised version before using later workflow stages.'
-            : hasRevisionPlanning
-              ? 'Step 1 changed. Regenerate the proposal blueprint, related work plan, critique, and revision plan before using later workflow stages.'
-              : hasCritique
-                ? 'Step 1 changed. Regenerate the proposal blueprint, related work plan, and critique before using later workflow stages.'
-                : hasRelatedWork
-                  ? 'Step 1 changed. Regenerate the proposal blueprint and related work plan before using later workflow stages.'
-                  : 'Step 1 changed. Regenerate the proposal blueprint before using later workflow stages.'
-      );
+      setCurrentDraftBlueprint(null);
+      setRelatedWorkStale(Boolean(relatedWorkPlan));
+      setCritiqueStale(Boolean(critiquePanelResult));
+      setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
+      setRevisionApplicationStale(Boolean(revisionPreview));
+      setProposalOutputStale(Boolean(proposalOutput));
+      setNotice('Step 1 changed. Step 2 must be regenerated next, and Steps 3 through 7 stay locked until you redo the pipeline in order.');
     }
   }
 
@@ -479,6 +499,7 @@ function App() {
     setAnalysisMode(null);
     setLastAnalyzedAt('');
     setProposalBlueprint(null);
+    setCurrentDraftBlueprint(null);
     setBlueprintMode(null);
     setBlueprintStatus('idle');
     setBlueprintError('');
@@ -500,6 +521,7 @@ function App() {
     setRevisionPlan(null);
     setRevisionPlanStale(false);
     setRevisionPlanUpdatedAt('');
+    setRevisionPreview(null);
     setProposalVersions([]);
     setCurrentVersionId('');
     setVersionComparison(null);
@@ -530,6 +552,7 @@ function App() {
     setAnalysisMode(null);
     setLastAnalyzedAt('');
     setProposalBlueprint(null);
+    setCurrentDraftBlueprint(null);
     setBlueprintMode(null);
     setBlueprintStatus('idle');
     setBlueprintError('');
@@ -551,6 +574,7 @@ function App() {
     setRevisionPlan(null);
     setRevisionPlanStale(false);
     setRevisionPlanUpdatedAt('');
+    setRevisionPreview(null);
     setProposalVersions([]);
     setCurrentVersionId('');
     setVersionComparison(null);
@@ -582,21 +606,7 @@ function App() {
     setCritiqueError('');
     setApplyRevisionsError('');
     setProposalOutputError('');
-    setNotice(
-      proposalOutput
-        ? 'Edit the idea intake, then re-analyze Step 1 before regenerating Steps 2, 3, 4, 5, 6, and 7.'
-        : proposalVersions.length || versionComparison
-          ? 'Edit the idea intake, then re-analyze Step 1 before regenerating Steps 2, 3, 4, 5, and 6.'
-          : revisionSuggestions.length || revisionPlan
-            ? 'Edit the idea intake, then re-analyze Step 1 before regenerating Steps 2, 3, 4, and 5.'
-            : critiquePanelResult
-              ? 'Edit the idea intake, then re-analyze Step 1 before regenerating Steps 2, 3, and 4.'
-              : relatedWorkPlan
-                ? 'Edit the idea intake, then re-analyze Step 1 before regenerating Steps 2 and 3.'
-                : proposalBlueprint
-                  ? 'Edit the idea intake, then re-analyze Step 1 before regenerating Step 2.'
-                  : ''
-    );
+    setNotice(proposalBlueprint ? 'Edit the idea intake, then re-analyze Step 1. After that, Step 2 becomes stale and the rest of the pipeline must be redone in order.' : '');
   }
 
   function handleAnalyzeIdea() {
@@ -629,25 +639,16 @@ function App() {
     setActiveStep('idea-intake');
     setIsEditingIdea(false);
     setBlueprintStale(Boolean(proposalBlueprint));
+    setCurrentDraftBlueprint(null);
     setRelatedWorkStale(Boolean(relatedWorkPlan));
     setCritiqueStale(Boolean(critiquePanelResult));
     setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
-    setRevisionApplicationStale(Boolean(proposalVersions.length || versionComparison));
+    setRevisionApplicationStale(Boolean(revisionPreview));
     setProposalOutputStale(Boolean(proposalOutput));
     setNotice(
-      proposalOutput
-        ? 'Step 1 updated. Regenerate the proposal blueprint, related work plan, critique, revision plan, revised version, and proposal output to sync Steps 2 through 7.'
-        : proposalVersions.length || versionComparison
-          ? 'Step 1 updated. Regenerate the proposal blueprint, related work plan, critique, revision plan, and revised version to sync Steps 2 through 6.'
-          : revisionSuggestions.length || revisionPlan
-            ? 'Step 1 updated. Regenerate the proposal blueprint, related work plan, critique, and revision plan to sync Steps 2 through 5.'
-            : critiquePanelResult
-              ? 'Step 1 updated. Regenerate the proposal blueprint, related work plan, and critique to sync Steps 2, 3, and 4.'
-              : relatedWorkPlan
-                ? 'Step 1 updated. Regenerate the proposal blueprint and related work plan to sync Steps 2 and 3.'
-                : proposalBlueprint
-                  ? 'Step 1 updated. Regenerate the proposal blueprint to sync Step 2 with the latest intake.'
-                  : 'Step 1 complete. Generate the proposal blueprint to move into Step 2.'
+      proposalBlueprint
+        ? 'Step 1 updated. Step 2 is now stale, and Steps 3 through 7 stay locked until you regenerate each step in order again.'
+        : 'Step 1 complete. Generate the proposal blueprint to move into Step 2.'
     );
     setIntakeStatus('idle');
   }
@@ -675,41 +676,35 @@ function App() {
       });
 
       setProposalBlueprint(data.blueprint || null);
+      setCurrentDraftBlueprint(null);
       setBlueprintMode(data.mode === 'api' ? 'api' : 'template');
       setBlueprintGeneratedAt(new Date().toISOString());
       setBlueprintStale(false);
       setRelatedWorkStale(Boolean(relatedWorkPlan));
       setCritiqueStale(Boolean(critiquePanelResult));
       setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
-      setRevisionApplicationStale(Boolean(proposalVersions.length || versionComparison));
+      setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
       setBlueprintStatus('idle');
       setNotice(
-        proposalOutput
-          ? 'Proposal blueprint refreshed. Regenerate Steps 3, 4, 5, 6, and 7 so the later workflow matches the latest scaffold.'
-          : proposalVersions.length || versionComparison
-            ? 'Proposal blueprint refreshed. Regenerate Steps 3, 4, 5, and 6 so the later workflow matches the latest scaffold.'
-            : revisionSuggestions.length || revisionPlan
-              ? 'Proposal blueprint refreshed. Regenerate Steps 3, 4, and 5 so the later workflow matches the latest scaffold.'
-              : critiquePanelResult
-                ? 'Proposal blueprint refreshed. Regenerate Steps 3 and 4 so the literature plan and critique match the latest scaffold.'
-                : relatedWorkPlan
-                  ? 'Proposal blueprint refreshed. Regenerate Step 3 so the related work plan matches the latest scaffold.'
-                : data.mode === 'api'
-                  ? 'Proposal blueprint generated with Gemini and saved as Step 2.'
-                  : 'Proposal blueprint generated from the deterministic Stage 1 fallback.'
+        relatedWorkPlan
+          ? 'Step 2 updated. Step 3 must be regenerated next, and Steps 4 through 7 stay locked until you redo them in order.'
+          : data.mode === 'api'
+            ? 'Proposal blueprint generated with Gemini and saved as Step 2.'
+            : 'Proposal blueprint generated from the deterministic Stage 1 fallback.'
       );
     } catch (requestError) {
       const fallbackBlueprint = buildClientFallbackBlueprint(ideaInput, ideaPreview);
 
       setProposalBlueprint(fallbackBlueprint);
+      setCurrentDraftBlueprint(null);
       setBlueprintMode('template');
       setBlueprintGeneratedAt(new Date().toISOString());
       setBlueprintStale(false);
       setRelatedWorkStale(Boolean(relatedWorkPlan));
       setCritiqueStale(Boolean(critiquePanelResult));
       setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
-      setRevisionApplicationStale(Boolean(proposalVersions.length || versionComparison));
+      setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
       setBlueprintStatus('idle');
       setBlueprintError('');
@@ -746,37 +741,33 @@ function App() {
       });
 
       setRelatedWorkPlan(data.relatedWorkPlan || null);
+      setCurrentDraftBlueprint(null);
       setRelatedWorkMode(data.mode === 'api' ? 'api' : 'template');
       setRelatedWorkGeneratedAt(new Date().toISOString());
       setRelatedWorkStale(false);
       setCritiqueStale(Boolean(critiquePanelResult));
       setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
-      setRevisionApplicationStale(Boolean(proposalVersions.length || versionComparison));
+      setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
       setRelatedWorkStatus('idle');
       setNotice(
-        proposalOutput
-          ? 'Related work plan refreshed. Regenerate Steps 4, 5, 6, and 7 so the later workflow matches the latest literature plan.'
-          : proposalVersions.length || versionComparison
-            ? 'Related work plan refreshed. Regenerate Steps 4, 5, and 6 so the critique, revision plan, and revised version match the latest literature plan.'
-            : revisionSuggestions.length || revisionPlan
-              ? 'Related work plan refreshed. Regenerate Steps 4 and 5 so the critique and revision plan match the latest literature plan.'
-              : critiquePanelResult
-                ? 'Related work plan refreshed. Regenerate Step 4 so the critique matches the latest literature plan.'
-                : data.mode === 'api'
-                  ? 'Related work plan generated with Gemini and saved as Step 3.'
-                  : 'Related work plan generated from the deterministic Stage 1 fallback.'
+        critiquePanelResult
+          ? 'Step 3 updated. Step 4 must be regenerated next, and Steps 5 through 7 stay locked until you redo them in order.'
+          : data.mode === 'api'
+            ? 'Related work plan generated with Gemini and saved as Step 3.'
+            : 'Related work plan generated from the deterministic Stage 1 fallback.'
       );
     } catch (requestError) {
       const fallbackPlan = buildClientFallbackRelatedWorkPlan(ideaInput, proposalBlueprint);
 
       setRelatedWorkPlan(fallbackPlan);
+      setCurrentDraftBlueprint(null);
       setRelatedWorkMode('template');
       setRelatedWorkGeneratedAt(new Date().toISOString());
       setRelatedWorkStale(false);
       setCritiqueStale(Boolean(critiquePanelResult));
       setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
-      setRevisionApplicationStale(Boolean(proposalVersions.length || versionComparison));
+      setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
       setRelatedWorkStatus('idle');
       setRelatedWorkError('');
@@ -821,6 +812,7 @@ function App() {
       const nextSuggestions = buildRevisionSuggestionsFromCritique(nextCritique);
 
       setCritiquePanelResult(nextCritique);
+      setCurrentDraftBlueprint(null);
       setCritiqueMode(data.mode === 'api' ? 'api' : 'template');
       setCritiqueGeneratedAt(generatedAt);
       setCritiqueStale(false);
@@ -828,7 +820,7 @@ function App() {
       setRevisionPlan(buildRevisionPlan(nextSuggestions));
       setRevisionPlanStale(false);
       setRevisionPlanUpdatedAt(generatedAt);
-      setRevisionApplicationStale(Boolean(proposalVersions.length || versionComparison));
+      setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
       setCritiqueStatus('idle');
       setNotice(
@@ -842,6 +834,7 @@ function App() {
       const nextSuggestions = buildRevisionSuggestionsFromCritique(fallbackCritique);
 
       setCritiquePanelResult(fallbackCritique);
+      setCurrentDraftBlueprint(null);
       setCritiqueMode('template');
       setCritiqueGeneratedAt(generatedAt);
       setCritiqueStale(false);
@@ -849,7 +842,7 @@ function App() {
       setRevisionPlan(buildRevisionPlan(nextSuggestions));
       setRevisionPlanStale(false);
       setRevisionPlanUpdatedAt(generatedAt);
-      setRevisionApplicationStale(Boolean(proposalVersions.length || versionComparison));
+      setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
       setCritiqueStatus('idle');
       setCritiqueError('');
@@ -900,11 +893,14 @@ function App() {
     setRevisionPlan(buildRevisionPlan(nextSuggestions));
     setRevisionPlanStale(false);
     setRevisionPlanUpdatedAt(new Date().toISOString());
-    if (changed && (proposalVersions.length || versionComparison)) {
+    if (changed && revisionPreview) {
       setRevisionApplicationStale(true);
     }
     if (changed && proposalOutput) {
       setProposalOutputStale(true);
+    }
+    if (changed) {
+      setNotice('Step 5 changed. Re-apply revisions in Step 6, then regenerate Step 7 to save a new proposal version.');
     }
   }
 
@@ -922,6 +918,12 @@ function App() {
     setRevisionPlan(buildRevisionPlan(nextSuggestions));
     setRevisionPlanStale(false);
     setRevisionPlanUpdatedAt(new Date().toISOString());
+    if (revisionPreview) {
+      setRevisionApplicationStale(true);
+    }
+    if (proposalOutput) {
+      setProposalOutputStale(true);
+    }
   }
 
   async function handleApplyAcceptedRevisions() {
@@ -936,7 +938,7 @@ function App() {
     }
 
     if (revisionPlanStale || critiqueStale) {
-      setNotice('Refresh the critique and revision plan before applying revisions so the accepted suggestions match the current draft.');
+      setNotice('Refresh Step 4 first so Step 5 is based on the latest critique before applying revisions.');
       return;
     }
 
@@ -971,55 +973,43 @@ function App() {
     }
 
     const generatedAt = new Date().toISOString();
-    const nextVersionSet = createVersionSet({
+    const nextPreview = createRevisionPreview({
       currentBlueprint: proposalBlueprint,
-      currentVersionId,
-      critiquePanelResult,
-      existingVersions: proposalVersions,
       generatedAt,
       revisionPlan,
       result: applyRevisionResult
     });
 
-    setProposalBlueprint(applyRevisionResult.revisedBlueprint);
-    setBlueprintGeneratedAt(generatedAt);
-    setBlueprintMode(mode);
-    setBlueprintStale(false);
-    setRelatedWorkStale(Boolean(relatedWorkPlan));
-    setCritiqueStale(Boolean(critiquePanelResult));
-    setRevisionPlanStale(true);
+    setCurrentDraftBlueprint(applyRevisionResult.revisedBlueprint);
+    setRevisionPreview(nextPreview);
     setRelatedWorkError('');
     setCritiqueError('');
-    setProposalVersions(nextVersionSet.versions);
-    setCurrentVersionId(nextVersionSet.currentVersionId);
-    setVersionComparison(nextVersionSet.versionComparison);
-    setSelectedComparison(nextVersionSet.selectedComparison);
     setApplyRevisionsMode(mode);
     setApplyRevisionsGeneratedAt(generatedAt);
     setRevisionApplicationStale(false);
-    setProposalOutputStale(Boolean(proposalOutput));
+    setProposalOutputStale(true);
     setApplyRevisionsStatus('idle');
     setApplyRevisionsError('');
     setNotice(
       mode === 'api'
-        ? 'Accepted revisions applied with Gemini. The revised blueprint is now the current working draft and Version 2 has been saved.'
-        : 'Accepted revisions applied from the deterministic Stage 1 fallback. The revised blueprint is now the current working draft and a new version has been saved.'
+        ? 'Accepted revisions applied with Gemini. Review Step 6, then generate Step 7 to save this updated proposal as a new version.'
+        : 'Accepted revisions applied from the deterministic Stage 1 fallback. Review Step 6, then generate Step 7 to save this updated proposal as a new version.'
     );
   }
 
   async function handleGenerateProposalOutput() {
-    if (!proposalBlueprint) {
-      setNotice('Generate or restore a proposal blueprint before creating the final proposal output.');
+    if (!currentDraftBlueprint) {
+      setNotice('Apply accepted revisions first so Step 7 has a current revised draft to export.');
       return;
     }
 
-    if (proposalVersions.length < 2) {
-      setNotice('Apply accepted revisions first so Step 7 is built from a saved current draft.');
+    if (!revisionPreview?.afterVersion) {
+      setNotice('Apply accepted revisions first so Step 7 is built from the latest revised draft.');
       return;
     }
 
     if (revisionApplicationStale) {
-      setNotice('Apply revisions again before generating the proposal output so Step 7 matches the latest accepted revision plan.');
+      setNotice('Step 6 is stale. Re-apply revisions before generating Step 7 so the saved proposal version matches the latest Step 5 decisions.');
       return;
     }
 
@@ -1039,18 +1029,30 @@ function App() {
       const payload = buildProposalRequestPayload({
         currentVersionId,
         ideaInput,
-        proposalBlueprint,
+        proposalBlueprint: currentDraftBlueprint,
         proposalVersions
       });
       const data = await postJson('/api/proposal', payload);
-      const normalizedOutput = normalizeProposalOutputResult(data, ideaInput, proposalBlueprint, payload.title);
+      const normalizedOutput = normalizeProposalOutputResult(data, ideaInput, currentDraftBlueprint, payload.title);
       const nextOutput = normalizedOutput.output;
+      const nextVersionSet = createFinalVersionSet({
+        critiquePanelResult,
+        existingVersions: proposalVersions,
+        generatedAt: new Date().toISOString(),
+        revisionPlan,
+        revisedBlueprint: currentDraftBlueprint,
+        revisionPreview
+      });
 
       setProposalOutput(nextOutput);
       setProposalOutputMode(normalizedOutput.mode);
-      setProposalOutputGeneratedAt(new Date().toISOString());
+      setProposalOutputGeneratedAt(nextVersionSet.generatedAt);
       setProposalOutputStale(false);
       setProposalOutputTab('pdf');
+      setProposalVersions(nextVersionSet.versions);
+      setCurrentVersionId(nextVersionSet.currentVersionId);
+      setSelectedComparison(nextVersionSet.selectedComparison);
+      setVersionComparison(nextVersionSet.versionComparison);
       try {
         await refreshProposalPdf(nextOutput.proposalLatex, nextOutput.title, true);
       } catch {
@@ -1059,17 +1061,29 @@ function App() {
       setProposalOutputStatus('idle');
       setNotice(
         data.mode === 'api'
-          ? 'Proposal output generated with Gemini. Step 7 now shows the current PDF and LaTeX draft.'
-          : 'Proposal output generated from the deterministic fallback. Step 7 now shows the current PDF and LaTeX draft.'
+          ? 'Proposal output generated with Gemini. A new finalized proposal version has been saved in history.'
+          : 'Proposal output generated from the deterministic fallback. A new finalized proposal version has been saved in history.'
       );
     } catch (requestError) {
-      const fallbackOutput = buildClientFallbackProposalOutput(ideaInput, proposalBlueprint);
+      const fallbackOutput = buildClientFallbackProposalOutput(ideaInput, currentDraftBlueprint);
+      const nextVersionSet = createFinalVersionSet({
+        critiquePanelResult,
+        existingVersions: proposalVersions,
+        generatedAt: new Date().toISOString(),
+        revisionPlan,
+        revisedBlueprint: currentDraftBlueprint,
+        revisionPreview
+      });
 
       setProposalOutput(fallbackOutput);
       setProposalOutputMode('template');
-      setProposalOutputGeneratedAt(new Date().toISOString());
+      setProposalOutputGeneratedAt(nextVersionSet.generatedAt);
       setProposalOutputStale(false);
       setProposalOutputTab('latex');
+      setProposalVersions(nextVersionSet.versions);
+      setCurrentVersionId(nextVersionSet.currentVersionId);
+      setSelectedComparison(nextVersionSet.selectedComparison);
+      setVersionComparison(nextVersionSet.versionComparison);
 
       try {
         await refreshProposalPdf(fallbackOutput.proposalLatex, fallbackOutput.title, true);
@@ -1184,7 +1198,7 @@ function App() {
       </header>
 
       <section className="studio-body">
-        <WorkflowProgressRail activeStep={activeStep} completedSteps={completedSteps} steps={WORKFLOW_STEPS} />
+        <WorkflowProgressRail onSelectStep={handleSelectStep} selectedStep={activeStep} stepMetaById={stepMetaById} steps={WORKFLOW_STEPS} />
 
         <section className="studio-main">
           {(notice || error) && (
@@ -1199,7 +1213,7 @@ function App() {
             </div>
           )}
 
-          {showingEditor ? (
+          {activeStep === 'idea-intake' && showingEditor ? (
             <div className="workspace-grid">
               <IdeaIntakeScreen
                 completedFieldCount={completedFieldCount}
@@ -1242,19 +1256,8 @@ function App() {
                 status={intakeStatus}
               />
             </div>
-          ) : (
+          ) : activeStep === 'proposal-blueprint' ? (
             <div className="blueprint-workspace">
-              <CompletedIdeaSummary
-                blueprintExists={Boolean(proposalBlueprint)}
-                blueprintStale={blueprintStale}
-                blueprintStatus={blueprintStatus}
-                ideaInput={ideaInput}
-                ideaPreview={ideaPreview}
-                lastAnalyzedAt={lastAnalyzedAt}
-                onEdit={handleEditIdeaIntake}
-                onGenerateBlueprint={handleGenerateProposalBlueprint}
-              />
-
               <ProposalBlueprintPanel
                 blueprint={proposalBlueprint}
                 blueprintError={blueprintError}
@@ -1268,93 +1271,85 @@ function App() {
                 relatedWorkStale={relatedWorkStale}
                 relatedWorkStatus={relatedWorkStatus}
               />
-
-              {activeStep === 'related-work' || relatedWorkPlan || relatedWorkStatus !== 'idle' ? (
-                <RelatedWorkPlanPanel
-                  critiquePanelExists={Boolean(critiquePanelResult)}
-                  critiqueStale={critiqueStale}
-                  critiqueStatus={critiqueStatus}
-                  onGenerate={handleGenerateRelatedWorkPlan}
-                  onRunCritique={handleRunCritique}
-                  relatedWorkError={relatedWorkError}
-                  relatedWorkGeneratedAt={relatedWorkGeneratedAt}
-                  relatedWorkMode={relatedWorkMode}
-                  relatedWorkPlan={relatedWorkPlan}
-                  relatedWorkStale={relatedWorkStale}
-                  relatedWorkStatus={relatedWorkStatus}
-                />
-              ) : null}
-
-              {activeStep === 'multi-agent-critique' || critiquePanelResult || critiqueStatus !== 'idle' ? (
-                <CritiquePanel
-                  critiqueError={critiqueError}
-                  critiqueGeneratedAt={critiqueGeneratedAt}
-                  critiqueMode={critiqueMode}
-                  critiquePanelResult={critiquePanelResult}
-                  critiqueStale={critiqueStale}
-                  critiqueStatus={critiqueStatus}
-                  onGenerate={handleRunCritique}
-                  onStartRevisionPlanning={handleStartRevisionPlanning}
-                  revisionPlanExists={Boolean(revisionSuggestions.length)}
-                />
-              ) : null}
-
-              {activeStep === 'revision-planning' ? (
-                <RevisionPlanningPanel
-                  applyRevisionsStatus={applyRevisionsStatus}
-                  critiqueGeneratedAt={critiqueGeneratedAt}
-                  critiqueStale={critiqueStale}
-                  onApplyAcceptedRevisions={handleApplyAcceptedRevisions}
-                  onSuggestionNoteChange={handleSuggestionNoteChange}
-                  onSuggestionStatusChange={handleSuggestionStatusChange}
-                  proposalVersionsCount={proposalVersions.length}
-                  revisionApplicationStale={revisionApplicationStale}
-                  revisionPlan={revisionPlan}
-                  revisionPlanStale={revisionPlanStale}
-                  revisionPlanUpdatedAt={revisionPlanUpdatedAt}
-                  revisionSuggestions={revisionSuggestions}
-                />
-              ) : null}
-
-              {activeStep === 'apply-revisions' || proposalVersions.length || applyRevisionsStatus !== 'idle' ? (
-                <ApplyRevisionsPanel
-                  applyRevisionsError={applyRevisionsError}
-                  applyRevisionsGeneratedAt={applyRevisionsGeneratedAt}
-                  applyRevisionsMode={applyRevisionsMode}
-                  applyRevisionsStatus={applyRevisionsStatus}
-                  currentVersionId={currentVersionId}
-                  onApply={handleApplyAcceptedRevisions}
-                  onGenerateProposalOutput={handleGenerateProposalOutput}
-                  onSelectVersionComparison={handleSelectVersionComparison}
-                  proposalOutputExists={Boolean(proposalOutput)}
-                  proposalOutputStatus={proposalOutputStatus}
-                  proposalOutputStale={proposalOutputStale}
-                  proposalVersions={proposalVersions}
-                  revisionApplicationStale={revisionApplicationStale}
-                  revisionPlan={revisionPlan}
-                  selectedComparison={selectedComparison}
-                  versionComparison={versionComparison}
-                />
-              ) : null}
-
-              {activeStep === 'proposal-output' || proposalOutput || proposalOutputStatus !== 'idle' ? (
-                <ProposalOutputPanel
-                  currentVersionId={currentVersionId}
-                  onGenerate={handleGenerateProposalOutput}
-                  onTabChange={setProposalOutputTab}
-                  proposalOutput={proposalOutput}
-                  proposalOutputError={proposalOutputError}
-                  proposalOutputGeneratedAt={proposalOutputGeneratedAt}
-                  proposalOutputMode={proposalOutputMode}
-                  proposalOutputStale={proposalOutputStale}
-                  proposalOutputStatus={proposalOutputStatus}
-                  proposalOutputTab={proposalOutputTab}
-                  proposalPdfUrl={proposalPdfUrl}
-                  proposalVersions={proposalVersions}
-                  revisionApplicationStale={revisionApplicationStale}
-                />
-              ) : null}
             </div>
+          ) : activeStep === 'related-work' ? (
+            <RelatedWorkPlanPanel
+              critiquePanelExists={Boolean(critiquePanelResult)}
+              critiqueStale={critiqueStale}
+              critiqueStatus={critiqueStatus}
+              onGenerate={handleGenerateRelatedWorkPlan}
+              onRunCritique={handleRunCritique}
+              relatedWorkError={relatedWorkError}
+              relatedWorkGeneratedAt={relatedWorkGeneratedAt}
+              relatedWorkMode={relatedWorkMode}
+              relatedWorkPlan={relatedWorkPlan}
+              relatedWorkStale={relatedWorkStale}
+              relatedWorkStatus={relatedWorkStatus}
+            />
+          ) : activeStep === 'multi-agent-critique' ? (
+            <CritiquePanel
+              critiqueError={critiqueError}
+              critiqueGeneratedAt={critiqueGeneratedAt}
+              critiqueMode={critiqueMode}
+              critiquePanelResult={critiquePanelResult}
+              critiqueStale={critiqueStale}
+              critiqueStatus={critiqueStatus}
+              onGenerate={handleRunCritique}
+              onStartRevisionPlanning={handleStartRevisionPlanning}
+              revisionPlanExists={Boolean(revisionSuggestions.length)}
+            />
+          ) : activeStep === 'revision-planning' ? (
+            <RevisionPlanningPanel
+              applyRevisionsStatus={applyRevisionsStatus}
+              critiqueGeneratedAt={critiqueGeneratedAt}
+              critiqueStale={critiqueStale}
+              onApplyAcceptedRevisions={handleApplyAcceptedRevisions}
+              onSuggestionNoteChange={handleSuggestionNoteChange}
+              onSuggestionStatusChange={handleSuggestionStatusChange}
+              proposalVersionsCount={proposalVersions.length || (revisionPreview ? 1 : 0)}
+              revisionApplicationStale={revisionApplicationStale}
+              revisionPlan={revisionPlan}
+              revisionPlanStale={revisionPlanStale}
+              revisionPlanUpdatedAt={revisionPlanUpdatedAt}
+              revisionSuggestions={revisionSuggestions}
+            />
+          ) : activeStep === 'apply-revisions' ? (
+            <ApplyRevisionsPanel
+              applyRevisionsError={applyRevisionsError}
+              applyRevisionsGeneratedAt={applyRevisionsGeneratedAt}
+              applyRevisionsMode={applyRevisionsMode}
+              applyRevisionsStatus={applyRevisionsStatus}
+              currentVersionId={currentVersionId}
+              draftComparisonVersions={revisionPreview?.versions || []}
+              draftVersionComparison={revisionPreview?.comparison || null}
+              onApply={handleApplyAcceptedRevisions}
+              onGenerateProposalOutput={handleGenerateProposalOutput}
+              onSelectVersionComparison={handleSelectVersionComparison}
+              proposalOutputExists={Boolean(proposalOutput)}
+              proposalOutputStatus={proposalOutputStatus}
+              proposalOutputStale={proposalOutputStale}
+              proposalVersions={proposalVersions}
+              revisionApplicationStale={revisionApplicationStale}
+              revisionPlan={revisionPlan}
+              selectedComparison={selectedComparison}
+              versionComparison={versionComparison}
+            />
+          ) : (
+            <ProposalOutputPanel
+              currentVersionId={currentVersionId}
+              onGenerate={handleGenerateProposalOutput}
+              onTabChange={setProposalOutputTab}
+              proposalOutput={proposalOutput}
+              proposalOutputError={proposalOutputError}
+              proposalOutputGeneratedAt={proposalOutputGeneratedAt}
+              proposalOutputMode={proposalOutputMode}
+              proposalOutputStale={proposalOutputStale}
+              proposalOutputStatus={proposalOutputStatus}
+              proposalOutputTab={proposalOutputTab}
+              proposalPdfUrl={proposalPdfUrl}
+              proposalVersions={proposalVersions}
+              revisionApplicationStale={revisionApplicationStale}
+            />
           )}
         </section>
       </section>
@@ -1836,50 +1831,60 @@ function buildClientFallbackApplyRevisionResult(proposalBlueprint, revisionPlan)
   };
 }
 
-function createVersionSet({ currentBlueprint, currentVersionId, critiquePanelResult, existingVersions, generatedAt, revisionPlan, result }) {
-  const nextVersions = [...existingVersions];
-  let beforeVersion = findExistingVersionForBlueprint(nextVersions, currentVersionId, currentBlueprint);
-
-  if (!beforeVersion) {
-    beforeVersion = createProposalVersion({
-      versionNumber: nextVersions.length + 1,
-      label: nextVersions.length ? 'Current Blueprint' : 'Initial Blueprint',
-      createdAt: generatedAt,
-      blueprint: currentBlueprint,
-      appliedSuggestions: [],
-      changeSummary: [
-        nextVersions.length
-          ? 'Saved the current working blueprint before applying a new revision pass.'
-          : 'Saved the initial blueprint before accepted revisions were applied.'
-      ],
-      scoreBefore: critiquePanelResult?.overallScore
-    });
-    nextVersions.push(beforeVersion);
-  }
-
+function createRevisionPreview({ currentBlueprint, generatedAt, revisionPlan, result }) {
+  const beforeVersion = createProposalVersion({
+    versionNumber: 1,
+    label: 'Before Revisions',
+    createdAt: generatedAt,
+    blueprint: currentBlueprint,
+    appliedSuggestions: [],
+    changeSummary: ['Captured the working blueprint before applying the latest accepted revision plan.']
+  });
   const afterVersion = createProposalVersion({
-    versionNumber: nextVersions.length + 1,
-    label: 'Revised Blueprint',
+    versionNumber: 2,
+    label: 'Applied Revision Draft',
     createdAt: generatedAt,
     blueprint: result.revisedBlueprint,
     appliedSuggestions: revisionPlan.acceptedSuggestions || [],
     changeSummary: result.changeSummary || []
   });
 
-  nextVersions.push(afterVersion);
-
   return {
-    versions: nextVersions,
-    currentVersionId: afterVersion.id,
-    selectedComparison: {
-      beforeVersionId: beforeVersion.id,
-      afterVersionId: afterVersion.id
-    },
-    versionComparison: buildVersionComparison(beforeVersion, afterVersion, result.changedSections || [])
+    versions: [beforeVersion, afterVersion],
+    beforeVersion,
+    afterVersion,
+    comparison: buildVersionComparison(beforeVersion, afterVersion, result.changedSections || [])
   };
 }
 
-function createProposalVersion({ versionNumber, label, createdAt, blueprint, appliedSuggestions, changeSummary, scoreBefore, scoreAfter }) {
+function createFinalVersionSet({ critiquePanelResult, existingVersions, generatedAt, revisionPlan, revisedBlueprint, revisionPreview }) {
+  const nextVersion = createProposalVersion({
+    versionNumber: existingVersions.length + 1,
+    label: existingVersions.length ? 'Finalized Proposal Update' : 'Initial Final Proposal',
+    createdAt: generatedAt,
+    blueprint: revisedBlueprint,
+    appliedSuggestions: revisionPlan?.acceptedSuggestions || [],
+    changeSummary: revisionPreview?.afterVersion?.changeSummary || [],
+    scoreBefore: critiquePanelResult?.overallScore
+  });
+  const versions = [...existingVersions, nextVersion];
+  const selectedComparison = buildSelectedComparison(versions, nextVersion.id);
+
+  return {
+    generatedAt,
+    versions,
+    currentVersionId: nextVersion.id,
+    selectedComparison,
+    versionComparison: selectedComparison
+      ? buildVersionComparison(
+          versions.find((version) => version.id === selectedComparison.beforeVersionId),
+          versions.find((version) => version.id === selectedComparison.afterVersionId)
+        )
+      : null
+  };
+}
+
+function createProposalVersion({ versionNumber, label, createdAt, blueprint, appliedSuggestions, changeSummary, scoreBefore }) {
   return {
     id: `proposal-version-${versionNumber}-${createdAt}`,
     versionNumber,
@@ -1888,19 +1893,8 @@ function createProposalVersion({ versionNumber, label, createdAt, blueprint, app
     blueprint,
     appliedSuggestions,
     changeSummary,
-    scoreBefore,
-    scoreAfter
+    scoreBefore
   };
-}
-
-function findExistingVersionForBlueprint(versions, currentVersionId, blueprint) {
-  const currentVersion = versions.find((version) => version.id === currentVersionId);
-
-  if (currentVersion && blueprintFieldValuesEqual(currentVersion.blueprint, blueprint)) {
-    return currentVersion;
-  }
-
-  return versions.find((version) => blueprintFieldValuesEqual(version.blueprint, blueprint)) || null;
 }
 
 function buildSelectedComparison(versions, afterVersionId) {
@@ -2344,6 +2338,61 @@ function hasWorkspaceContent(
     Boolean(versionComparison) ||
     Boolean(proposalOutput)
   );
+}
+
+function buildStepMeta({ activeStep, completedSteps, staleSteps, steps }) {
+  const firstStaleIndex = steps.findIndex((step) => Boolean(staleSteps[step.id]));
+
+  return Object.fromEntries(
+    steps.map((step, index) => {
+      const isCompleted = completedSteps.has(step.id);
+      const isSelected = step.id === activeStep;
+      const isStale = Boolean(staleSteps[step.id]);
+      const previousStep = index > 0 ? steps[index - 1] : null;
+      const previousIsReady = previousStep ? completedSteps.has(previousStep.id) && !staleSteps[previousStep.id] : true;
+
+      let isSelectable = false;
+
+      if (index === 0) {
+        isSelectable = true;
+      } else if (firstStaleIndex >= 0) {
+        if (index < firstStaleIndex) {
+          isSelectable = isCompleted && !isStale;
+        } else if (index === firstStaleIndex) {
+          isSelectable = previousIsReady;
+        }
+      } else {
+        isSelectable = (isCompleted && !isStale) || previousIsReady;
+      }
+
+      return [
+        step.id,
+        {
+          isAvailable: previousIsReady || isCompleted,
+          isCompleted,
+          isLocked: !isSelectable,
+          isSelectable,
+          isSelected,
+          isStale
+        }
+      ];
+    })
+  );
+}
+
+function findFallbackStep(stepMetaById) {
+  return WORKFLOW_STEPS.find((step) => stepMetaById[step.id]?.isSelectable)?.id || 'idea-intake';
+}
+
+function buildLockedStepMessage(stepId, stepMetaById) {
+  const targetIndex = WORKFLOW_STEPS.findIndex((step) => step.id === stepId);
+  const blockingStep = WORKFLOW_STEPS.slice(0, targetIndex).find((step) => stepMetaById[step.id]?.isStale || !stepMetaById[step.id]?.isCompleted);
+
+  if (blockingStep) {
+    return `Step ${targetIndex + 1} is locked. Refresh ${blockingStep.title} first, then continue through the pipeline in order.`;
+  }
+
+  return 'That step is locked until the previous step is completed.';
 }
 
 async function postJson(url, body) {

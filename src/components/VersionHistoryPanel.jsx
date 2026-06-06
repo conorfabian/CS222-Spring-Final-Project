@@ -30,7 +30,7 @@ function VersionHistoryPanel({ currentVersionId, onSelectVersionComparison, prop
                   {isCurrent ? (
                     <span className="issue-section-chip">
                       <CheckCircle2 size={14} aria-hidden="true" />
-                      Current Draft
+                      Current Version
                     </span>
                   ) : null}
                 </div>

@@ -18,7 +18,7 @@ function ProposalOutputPanel({
   const hasOutput = Boolean(proposalOutput?.proposalLatex);
   const currentVersion = proposalVersions.find((version) => version.id === currentVersionId) || proposalVersions.at(-1) || null;
   const modeLabel = proposalOutputMode === 'api' ? 'Gemini' : proposalOutputMode === 'template' ? 'Template' : 'Waiting';
-  const canGenerate = proposalVersions.length >= 2 && !revisionApplicationStale && proposalOutputStatus !== 'generating';
+  const canGenerate = !revisionApplicationStale && proposalOutputStatus !== 'generating';
 
   return (
     <section className="proposal-output-panel panel-card">
@@ -26,7 +26,7 @@ function ProposalOutputPanel({
         <div>
           <span className="eyebrow">Step 7</span>
           <h2>Proposal Output</h2>
-          <p>This step shows the current proposal artifact as a PDF and a compile-ready LaTeX document built from the latest revised draft.</p>
+          <p>This step shows the current proposal artifact as a PDF and a compile-ready LaTeX document, and saves a finalized version in history each time you regenerate it from a fresh draft.</p>
         </div>
         <span className={proposalOutputMode ? 'mode-pill is-ready' : 'mode-pill'}>{modeLabel}</span>
       </div>
@@ -39,7 +39,7 @@ function ProposalOutputPanel({
       </div>
 
       {revisionApplicationStale ? (
-        <div className="stale-banner">Apply revisions again before generating Step 7 so the output matches the latest accepted revision plan.</div>
+        <div className="stale-banner">Step 6 is stale. Apply revisions again before generating Step 7 so the saved proposal version matches the latest accepted revision plan.</div>
       ) : null}
 
       {proposalOutputStale ? (
@@ -57,7 +57,7 @@ function ProposalOutputPanel({
         <div className="blueprint-empty-state">
           <FileText size={28} aria-hidden="true" />
           <h3>Proposal output pending</h3>
-          <p>Generate Step 7 to create the current PDF and LaTeX proposal artifact from the latest revised blueprint.</p>
+          <p>Generate Step 7 to create the current PDF and LaTeX proposal artifact and save the latest finalized proposal version.</p>
         </div>
       ) : null}
 

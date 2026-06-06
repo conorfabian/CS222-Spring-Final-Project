@@ -1,6 +1,6 @@
 import { GitCompareArrows, Sparkles } from 'lucide-react';
 
-function VersionComparisonPanel({ proposalVersions, versionComparison }) {
+function VersionComparisonPanel({ emptyMessage = 'Comparison pending.', proposalVersions, versionComparison }) {
   const beforeVersion = proposalVersions.find((version) => version.id === versionComparison?.beforeVersionId) || null;
   const afterVersion = proposalVersions.find((version) => version.id === versionComparison?.afterVersionId) || null;
 
@@ -14,7 +14,7 @@ function VersionComparisonPanel({ proposalVersions, versionComparison }) {
       {!versionComparison || !beforeVersion || !afterVersion ? (
         <div className="comparison-empty-state">
           <h3>Comparison pending</h3>
-          <p>Apply accepted revisions to generate a saved before/after blueprint comparison.</p>
+          <p>{emptyMessage}</p>
         </div>
       ) : (
         <div className="comparison-stack">
