@@ -27,13 +27,32 @@ export async function proposalLatexToPdf(latex, title = 'proposal') {
         maxBuffer: 1024 * 1024 * 8
       });
     } catch (error) {
-      return Buffer.from(renderProposalPdfBytes(source, title));
+      if (isMissingTectonicError(error)) {
+        return Buffer.from(renderProposalPdfBytes(source, title));
+      }
+
+      throw createPdfCompileError(error);
     }
 
     return await readFile(pdfPath);
   } finally {
     await rm(workdir, { recursive: true, force: true });
   }
+}
+
+function isMissingTectonicError(error) {
+  const code = typeof error?.code === 'string' ? error.code : '';
+  const message = typeof error?.message === 'string' ? error.message : '';
+
+  return code === 'ENOENT' || code === 'EACCES' || /spawn\s+tectonic/i.test(message);
+}
+
+function createPdfCompileError(error) {
+  const stderr = typeof error?.stderr === 'string' ? error.stderr.trim() : '';
+  const stdout = typeof error?.stdout === 'string' ? error.stdout.trim() : '';
+  const detail = stderr || stdout || (error instanceof Error ? error.message : String(error));
+
+  return new Error(`LaTeX PDF compilation failed. ${detail}`.trim());
 }
 
 function sanitizeLatexForExport(source) {

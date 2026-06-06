@@ -2173,17 +2173,43 @@ function buildClientFallbackProposalOutput(ideaInput, proposalBlueprint) {
 function normalizeProposalOutputResult(data, ideaInput, proposalBlueprint, fallbackTitle) {
   const fallbackOutput = buildClientFallbackProposalOutput(ideaInput, proposalBlueprint);
   const normalizedTitle = clean(fallbackTitle) || fallbackOutput.title || 'Proposal Draft';
+  const proposalLatex = extractProposalOutputLatex(data) || fallbackOutput.proposalLatex;
 
   return {
     mode: data?.mode === 'api' ? 'api' : 'template',
     output: {
-      proposalLatex: fallbackOutput.proposalLatex,
+      proposalLatex,
       complianceMatrix: Array.isArray(data?.complianceMatrix) ? data.complianceMatrix : [],
       evaluationReport: clean(data?.evaluationReport),
       questions: Array.isArray(data?.questions) ? data.questions : [],
       title: normalizedTitle
     }
   };
+}
+
+function extractProposalOutputLatex(data) {
+  const candidates = [data?.proposalLatex, data?.proposalTex, data?.latex, data?.tex]
+    .map(unwrapProposalOutputCandidate)
+    .filter(Boolean);
+
+  return candidates.find(isUsableProposalLatex) || '';
+}
+
+function unwrapProposalOutputCandidate(value) {
+  const candidate = clean(value);
+
+  if (!candidate) {
+    return '';
+  }
+
+  const fenced = candidate.match(/```(?:latex|tex)?\s*([\s\S]*?)```/i);
+  return clean(fenced?.[1] || candidate);
+}
+
+function isUsableProposalLatex(value) {
+  const latex = clean(value);
+
+  return Boolean(latex) && /\\(?:documentclass\b|begin\{document\}|section\{)/.test(latex);
 }
 
 function buildClientFallbackProposalLatex(ideaInput, proposalBlueprint) {
