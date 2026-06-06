@@ -2,7 +2,11 @@ import { AlertTriangle, ArrowRight, BookOpenCheck, Loader2, RefreshCw, Search, S
 import RelatedWorkBucketCard from './RelatedWorkBucketCard.jsx';
 
 function RelatedWorkPlanPanel({
+  critiquePanelExists,
+  critiqueStale,
+  critiqueStatus,
   onGenerate,
+  onRunCritique,
   relatedWorkError,
   relatedWorkGeneratedAt,
   relatedWorkMode,
@@ -31,9 +35,18 @@ function RelatedWorkPlanPanel({
           {relatedWorkStatus === 'generating' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
           {relatedWorkPlan ? 'Regenerate Related Work Plan' : 'Generate Related Work Plan'}
         </button>
-        <button className="ghost" disabled={!relatedWorkPlan || relatedWorkStale} type="button">
+        <button
+          className="ghost"
+          disabled={!relatedWorkPlan || relatedWorkStale || critiqueStatus === 'generating'}
+          type="button"
+          onClick={onRunCritique}
+        >
+          {critiqueStatus === 'generating' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <ArrowRight size={16} aria-hidden="true" />}
+          {critiquePanelExists ? 'Run Critique Again' : 'Run Multi-Agent Critique'}
+        </button>
+        <button className="ghost" disabled={!critiquePanelExists || critiqueStale} type="button">
           <ArrowRight size={16} aria-hidden="true" />
-          Next: Critique Proposal
+          Next: Accept or Reject Suggestions
         </button>
       </div>
 
@@ -88,7 +101,11 @@ function RelatedWorkPlanPanel({
             </span>
             <span>
               <Sparkles size={16} aria-hidden="true" />
-              {relatedWorkStale ? 'Refresh required before critique agents' : 'Ready for retrieval and critique planning'}
+              {relatedWorkStale
+                ? 'Refresh required before critique agents'
+                : critiquePanelExists && !critiqueStale
+                  ? 'Critique is current'
+                  : 'Ready for critique planning'}
             </span>
           </div>
 

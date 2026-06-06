@@ -4,8 +4,10 @@ import express from 'express';
 import { proposalLatexToPdf } from './pdfExport.js';
 import {
   answerAgentQuestion,
+  applyAcceptedRevisions,
   generateProposal,
   generateProposalBlueprint,
+  generateCritiquePanelResult,
   generateRelatedWorkPlan,
   startAgentSession
 } from './proposalGenerator.js';
@@ -63,9 +65,10 @@ app.post('/api/agent/answer', async (request, response) => {
 app.post('/api/proposal', async (request, response) => {
   try {
     const payload = request.body || {};
+    const topic = String(payload.topic || payload.ideaInput?.topic || payload.proposalBlueprint?.workingTitle || '').trim();
 
-    if (!String(payload.topic || '').trim()) {
-      response.status(400).json({ error: 'Topic is required.' });
+    if (!topic) {
+      response.status(400).json({ error: 'Topic or proposalBlueprint.workingTitle is required.' });
       return;
     }
 
@@ -118,6 +121,70 @@ app.post('/api/related-work', async (request, response) => {
   } catch (error) {
     response.status(500).json({
       error: 'Related work generation failed.',
+      detail: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.post('/api/critique', async (request, response) => {
+  try {
+    const payload = request.body || {};
+    const topic = String(payload.ideaInput?.topic || payload.topic || '').trim();
+    const proposalBlueprint = payload.proposalBlueprint || payload.blueprint;
+    const relatedWorkPlan = payload.relatedWorkPlan || payload.relatedWork;
+
+    if (!topic) {
+      response.status(400).json({ error: 'ideaInput.topic is required.' });
+      return;
+    }
+
+    if (!proposalBlueprint || typeof proposalBlueprint !== 'object') {
+      response.status(400).json({ error: 'proposalBlueprint is required.' });
+      return;
+    }
+
+    if (!relatedWorkPlan || typeof relatedWorkPlan !== 'object') {
+      response.status(400).json({ error: 'relatedWorkPlan is required.' });
+      return;
+    }
+
+    response.json(await generateCritiquePanelResult(payload));
+  } catch (error) {
+    response.status(500).json({
+      error: 'Critique generation failed.',
+      detail: error instanceof Error ? error.message : String(error)
+    });
+  }
+});
+
+app.post('/api/apply-revisions', async (request, response) => {
+  try {
+    const payload = request.body || {};
+    const proposalBlueprint = payload.proposalBlueprint || payload.blueprint;
+    const revisionPlan = payload.revisionPlan || payload.plan;
+    const acceptedSuggestions = Array.isArray(revisionPlan?.acceptedSuggestions)
+      ? revisionPlan.acceptedSuggestions
+      : [];
+
+    if (!proposalBlueprint || typeof proposalBlueprint !== 'object') {
+      response.status(400).json({ error: 'proposalBlueprint is required.' });
+      return;
+    }
+
+    if (!revisionPlan || typeof revisionPlan !== 'object') {
+      response.status(400).json({ error: 'revisionPlan is required.' });
+      return;
+    }
+
+    if (!acceptedSuggestions.length) {
+      response.status(400).json({ error: 'revisionPlan.acceptedSuggestions must contain at least one suggestion.' });
+      return;
+    }
+
+    response.json(await applyAcceptedRevisions(payload));
+  } catch (error) {
+    response.status(500).json({
+      error: 'Revision application failed.',
       detail: error instanceof Error ? error.message : String(error)
     });
   }

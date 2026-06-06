@@ -194,7 +194,11 @@ p {
 .panel-header-row h3,
 .summary-panel h2,
 .blueprint-panel h2,
-.related-work-panel h2 {
+.related-work-panel h2,
+.critique-panel h2,
+.revision-planning-panel h2,
+.apply-revisions-panel h2,
+.proposal-output-panel h2 {
   font-size: 1.35rem;
   letter-spacing: -0.03em;
 }
@@ -213,7 +217,19 @@ p {
 .summary-card p,
 .stale-banner,
 .related-card p,
-.related-bucket-card p {
+.related-bucket-card p,
+.critic-review-card p,
+.critique-overview-card p,
+.critique-priority-item p,
+.revision-plan-card p,
+.revision-suggestion-card p,
+.apply-summary-card p,
+.version-history-item p,
+.comparison-column p,
+.comparison-explanation,
+.comparison-empty-state p,
+.proposal-output-panel p,
+.latex-source-view {
   color: #536475;
   line-height: 1.55;
 }
@@ -395,7 +411,11 @@ p {
 .future-panel,
 .summary-panel,
 .blueprint-panel,
-.related-work-panel {
+.related-work-panel,
+.critique-panel,
+.revision-planning-panel,
+.apply-revisions-panel,
+.proposal-output-panel {
   padding: 22px;
 }
 
@@ -751,6 +771,26 @@ p {
   gap: 6px;
 }
 
+.critique-panel {
+  display: grid;
+  gap: 6px;
+}
+
+.revision-planning-panel {
+  display: grid;
+  gap: 6px;
+}
+
+.apply-revisions-panel {
+  display: grid;
+  gap: 6px;
+}
+
+.proposal-output-panel {
+  display: grid;
+  gap: 6px;
+}
+
 .blueprint-meta-row {
   margin-top: 18px;
 }
@@ -925,6 +965,632 @@ p {
     linear-gradient(180deg, rgba(255, 248, 236, 0.94), rgba(255, 255, 255, 0.96));
 }
 
+.critique-summary-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.critique-overview-card,
+.critique-priority-panel,
+.critique-revision-order-card,
+.critic-review-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(76, 135, 214, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(255, 255, 255, 0.96));
+}
+
+.critique-overview-card {
+  align-content: start;
+  background:
+    radial-gradient(circle at top right, rgba(21, 90, 74, 0.14), transparent 38%),
+    linear-gradient(180deg, rgba(241, 248, 245, 0.96), rgba(255, 255, 255, 0.96));
+}
+
+.subtle-eyebrow {
+  background: rgba(18, 61, 99, 0.08);
+  color: #204465;
+}
+
+.critique-score-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.critique-score-line strong {
+  color: #143f67;
+  font-size: clamp(2.4rem, 4vw, 3.4rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.critique-score-line span {
+  color: #466176;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.critique-priority-list,
+.critic-review-stack,
+.critique-issue-list,
+.revision-order-list {
+  display: grid;
+  gap: 12px;
+}
+
+.critique-priority-item,
+.critique-issue-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.critique-priority-item h4,
+.critique-issue-card h4,
+.critic-review-card h3,
+.revision-suggestion-card h3 {
+  color: #173f66;
+  font-size: 1rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.critic-review-header,
+.critique-issue-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.critic-review-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.74fr) minmax(0, 1.26fr);
+  gap: 16px;
+}
+
+.critic-subsection {
+  display: grid;
+  gap: 12px;
+}
+
+.critic-issues-section {
+  align-content: start;
+}
+
+.priority-badge,
+.issue-section-chip,
+.issue-critic-chip,
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.priority-badge,
+.issue-section-chip,
+.issue-critic-chip {
+  min-height: 28px;
+  padding: 5px 10px;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.priority-badge.is-high {
+  background: rgba(189, 75, 42, 0.14);
+  color: #9b351c;
+}
+
+.priority-badge.is-medium {
+  background: rgba(214, 157, 46, 0.18);
+  color: #85530f;
+}
+
+.priority-badge.is-low {
+  background: rgba(18, 61, 99, 0.1);
+  color: #1c4b77;
+}
+
+.issue-section-chip,
+.issue-critic-chip {
+  background: rgba(18, 61, 99, 0.08);
+  color: #204465;
+}
+
+.score-badge {
+  gap: 8px;
+  min-width: 94px;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+}
+
+.score-badge.is-strong {
+  background: rgba(228, 245, 240, 0.9);
+  color: #245546;
+}
+
+.score-badge.is-mixed {
+  background: rgba(252, 244, 224, 0.96);
+  color: #825116;
+}
+
+.score-badge.is-weak {
+  background: rgba(253, 237, 232, 0.92);
+  color: #8b311d;
+}
+
+.score-value {
+  font-size: 1.3rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.score-scale {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.critic-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.issue-revision-note,
+.recommendation-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(18, 61, 99, 0.06);
+  color: #17344b;
+  font-weight: 700;
+}
+
+.recommendation-note {
+  font-weight: 600;
+}
+
+.recommendation-note strong {
+  font-weight: 800;
+}
+
+.revision-planning-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.24fr) minmax(300px, 0.76fr);
+  gap: 18px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+.revision-suggestion-stack,
+.revision-plan-sidebar,
+.revision-count-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.revision-suggestion-card,
+.revision-plan-card,
+.revision-count-card {
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  border-radius: 24px;
+}
+
+.revision-suggestion-card,
+.revision-plan-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(76, 135, 214, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(255, 255, 255, 0.96));
+}
+
+.revision-suggestion-card.is-accepted {
+  border-color: rgba(23, 90, 76, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(21, 90, 74, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(240, 248, 244, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.revision-suggestion-card.is-rejected {
+  border-color: rgba(145, 56, 31, 0.12);
+  background:
+    radial-gradient(circle at top right, rgba(145, 56, 31, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(251, 245, 243, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.revision-suggestion-card.is-deferred {
+  border-color: rgba(17, 63, 103, 0.12);
+}
+
+.revision-suggestion-header,
+.revision-suggestion-topline,
+.revision-decision-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.revision-suggestion-header {
+  justify-content: space-between;
+}
+
+.revision-suggestion-topline {
+  flex-wrap: wrap;
+}
+
+.suggestion-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.suggestion-status-pill.is-accepted {
+  background: rgba(228, 245, 240, 0.92);
+  color: #245546;
+}
+
+.suggestion-status-pill.is-rejected {
+  background: rgba(253, 237, 232, 0.92);
+  color: #8b311d;
+}
+
+.suggestion-status-pill.is-deferred {
+  background: rgba(243, 247, 252, 0.96);
+  color: #173f66;
+}
+
+.revision-suggestion-body {
+  display: grid;
+  gap: 12px;
+}
+
+.revision-decision-row {
+  flex-wrap: wrap;
+}
+
+.is-compact {
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.ghost.is-danger,
+.secondary.is-danger {
+  color: #8b311d;
+}
+
+.secondary.is-danger {
+  border-color: rgba(145, 56, 31, 0.14);
+  background: rgba(253, 237, 232, 0.84);
+}
+
+.note-field {
+  gap: 10px;
+}
+
+.note-field span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.note-field textarea {
+  min-height: 96px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.revision-count-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.revision-count-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  place-items: start;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.revision-count-card strong {
+  font-size: 1.7rem;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.revision-count-card span {
+  color: #536475;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.revision-count-card.is-accepted {
+  background: rgba(228, 245, 240, 0.88);
+  color: #245546;
+}
+
+.revision-count-card.is-rejected {
+  background: rgba(253, 237, 232, 0.9);
+  color: #8b311d;
+}
+
+.revision-count-card.is-deferred {
+  background: rgba(243, 247, 252, 0.94);
+  color: #173f66;
+}
+
+.apply-revisions-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.apply-summary-card,
+.version-history-panel,
+.version-comparison-panel,
+.version-history-item,
+.comparison-section-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(76, 135, 214, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(255, 253, 248, 0.96), rgba(255, 255, 255, 0.96));
+}
+
+.apply-revisions-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.78fr) minmax(0, 1.22fr);
+  gap: 18px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+.version-history-panel,
+.version-comparison-panel,
+.version-history-list,
+.comparison-stack,
+.comparison-section-list {
+  display: grid;
+  gap: 14px;
+}
+
+.version-history-item.is-current {
+  border-color: rgba(23, 90, 76, 0.18);
+  background:
+    radial-gradient(circle at top right, rgba(21, 90, 74, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(240, 248, 244, 0.98), rgba(255, 255, 255, 0.96));
+}
+
+.version-history-item.is-selected {
+  box-shadow:
+    0 14px 28px rgba(20, 63, 103, 0.08),
+    inset 0 0 0 1px rgba(17, 63, 103, 0.08);
+}
+
+.version-history-topline,
+.comparison-version-row,
+.comparison-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.version-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.version-history-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #536475;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.version-summary-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.version-summary-list li {
+  color: #203244;
+  line-height: 1.55;
+}
+
+.version-compare-button {
+  justify-self: start;
+}
+
+.comparison-empty-state {
+  display: grid;
+  gap: 10px;
+  padding: 8px 2px 2px;
+}
+
+.comparison-version-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.comparison-arrow {
+  display: inline-flex;
+  align-items: center;
+  color: #204465;
+  font-weight: 900;
+}
+
+.comparison-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.comparison-column {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(250, 247, 240, 0.82);
+  border: 1px solid rgba(17, 32, 50, 0.06);
+}
+
+.comparison-column.is-after {
+  background: rgba(240, 248, 244, 0.92);
+}
+
+.comparison-column h4,
+.comparison-section-header h3,
+.version-history-topline h3 {
+  color: #173f66;
+  margin: 0;
+}
+
+.comparison-column h4 {
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.comparison-explanation {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(18, 61, 99, 0.06);
+}
+
+.comparison-explanation strong {
+  color: #17344b;
+}
+
+.proposal-output-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 8px;
+  border-radius: 20px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background: rgba(248, 244, 235, 0.72);
+  width: fit-content;
+}
+
+.proposal-output-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  border-radius: 999px;
+  padding: 0 16px;
+  background: transparent;
+  color: #29445b;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.proposal-output-tab.is-active {
+  background: linear-gradient(135deg, #143f67, #205f55);
+  color: #fff7ea;
+  box-shadow: 0 12px 24px rgba(20, 63, 103, 0.18);
+}
+
+.proposal-output-stage {
+  margin-top: 18px;
+}
+
+.proposal-output-view {
+  display: grid;
+  gap: 16px;
+}
+
+.proposal-output-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.proposal-pdf-frame,
+.latex-source-view {
+  width: 100%;
+  border-radius: 24px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.98), rgba(244, 248, 251, 0.94)),
+    rgba(255, 255, 255, 0.94);
+}
+
+.proposal-pdf-frame {
+  min-height: 900px;
+}
+
+.latex-source-view {
+  margin: 0;
+  padding: 20px;
+  overflow-x: auto;
+  font-family: "IBM Plex Mono", "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.output-download-link {
+  text-decoration: none;
+}
+
+.output-download-link.is-disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.is-compact-state {
+  min-height: 220px;
+}
+
+.empty-plan-copy {
+  color: #5d6671;
+}
+
+.next-step-button {
+  justify-self: start;
+}
+
+.revision-order-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.revision-order-list li {
+  color: #203244;
+  line-height: 1.55;
+}
+
 .checklist-list {
   gap: 12px;
 }
@@ -969,7 +1635,13 @@ p {
   .blueprint-card-grid,
   .related-work-top-grid,
   .related-work-bottom-grid,
-  .related-bucket-grid {
+  .related-bucket-grid,
+  .critique-summary-grid,
+  .critic-review-grid,
+  .revision-planning-layout,
+  .apply-revisions-summary-grid,
+  .apply-revisions-layout,
+  .comparison-columns {
     grid-template-columns: 1fr;
   }
 }
@@ -1005,7 +1677,9 @@ p {
   .summary-card-grid,
   .related-work-top-grid,
   .related-work-bottom-grid,
-  .related-bucket-grid {
+  .related-bucket-grid,
+  .critique-summary-grid,
+  .critic-review-grid {
     display: block;
   }
 
@@ -1017,6 +1691,13 @@ p {
   .summary-panel,
   .blueprint-panel,
   .related-work-panel {
+    padding: 18px;
+  }
+
+  .critique-panel,
+  .revision-planning-panel,
+  .apply-revisions-panel,
+  .proposal-output-panel {
     padding: 18px;
   }
 
@@ -1042,8 +1723,35 @@ p {
   .summary-card,
   .blueprint-section-card,
   .related-card,
-  .related-bucket-card {
+  .related-bucket-card,
+  .critic-review-card,
+  .critique-overview-card,
+  .critique-priority-panel,
+  .critique-revision-order-card,
+  .revision-suggestion-card,
+  .revision-plan-card,
+  .apply-summary-card,
+  .version-history-panel,
+  .version-comparison-panel,
+  .version-history-item,
+  .comparison-section-card,
+  .proposal-pdf-frame,
+  .latex-source-view {
     margin-bottom: 14px;
+  }
+
+  .proposal-output-tabs {
+    display: flex;
+    width: 100%;
+  }
+
+  .proposal-output-tab {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  .revision-count-grid {
+    grid-template-columns: 1fr;
   }
 
   .preview-empty,

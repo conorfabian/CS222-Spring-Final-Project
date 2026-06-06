@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { renderProposalPdfBytes } from '../shared/proposalPdfRenderer.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -19,11 +20,15 @@ export async function proposalLatexToPdf(latex, title = 'proposal') {
 
   try {
     await writeFile(texPath, sanitizeLatexForExport(ensureCompleteLatexDocument(source, title)), 'utf8');
-    await execFileAsync('tectonic', ['--outdir', workdir, texPath], {
-      cwd: workdir,
-      timeout: 60000,
-      maxBuffer: 1024 * 1024 * 8
-    });
+    try {
+      await execFileAsync('tectonic', ['--outdir', workdir, texPath], {
+        cwd: workdir,
+        timeout: 60000,
+        maxBuffer: 1024 * 1024 * 8
+      });
+    } catch (error) {
+      return Buffer.from(renderProposalPdfBytes(source, title));
+    }
 
     return await readFile(pdfPath);
   } finally {
