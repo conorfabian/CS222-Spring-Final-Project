@@ -7,17 +7,17 @@ function ProposalOutputPanel({
   proposalOutput,
   proposalOutputError,
   proposalOutputGeneratedAt,
-  proposalOutputMode,
   proposalOutputStale,
   proposalOutputStatus,
   proposalOutputTab,
   proposalPdfUrl,
   proposalVersions,
-  revisionApplicationStale
+  revisionApplicationStale,
+  sourceLabel,
+  transcriptEntry
 }) {
   const hasOutput = Boolean(proposalOutput?.proposalLatex);
   const currentVersion = proposalVersions.find((version) => version.id === currentVersionId) || proposalVersions.at(-1) || null;
-  const modeLabel = proposalOutputMode === 'api' ? 'Gemini' : proposalOutputMode === 'template' ? 'Template' : 'Waiting';
   const canGenerate = !revisionApplicationStale && proposalOutputStatus !== 'generating';
 
   return (
@@ -28,7 +28,7 @@ function ProposalOutputPanel({
           <h2>Proposal Output</h2>
           <p>This step shows the current proposal artifact as a PDF and a compile-ready LaTeX document, and saves a finalized version in history each time you regenerate it from a fresh draft.</p>
         </div>
-        <span className={proposalOutputMode ? 'mode-pill is-ready' : 'mode-pill'}>{modeLabel}</span>
+        <span className={sourceLabel !== 'Waiting' ? 'mode-pill is-ready' : 'mode-pill'}>{sourceLabel}</span>
       </div>
 
       <div className="action-row summary-actions">
@@ -141,6 +141,91 @@ function ProposalOutputPanel({
                 </pre>
               </div>
             )}
+          </div>
+
+          <div className="proposal-evidence-grid">
+            <article className="related-card">
+              <div className="preview-label">
+                <FileText size={16} aria-hidden="true" />
+                <span>Compliance Matrix</span>
+              </div>
+              {proposalOutput.complianceMatrix?.length ? (
+                <div className="compliance-matrix-list">
+                  {proposalOutput.complianceMatrix.map((row) => (
+                    <article className="compliance-matrix-row" key={row.requirement}>
+                      <div className="compliance-row-topline">
+                        <strong>{row.requirement}</strong>
+                        <span className={`priority-badge ${row.status === 'covered' ? 'is-covered' : 'is-medium'}`}>
+                          {row.status}
+                        </span>
+                      </div>
+                      <p>{row.evidence || 'No evidence summary returned.'}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty-plan-copy">No compliance matrix rows were returned for this proposal output.</p>
+              )}
+            </article>
+
+            <article className="related-card">
+              <div className="preview-label">
+                <FileCode2 size={16} aria-hidden="true" />
+                <span>Evaluation Report</span>
+              </div>
+              {proposalOutput.evaluationReport ? (
+                <pre className="evidence-report-view">
+                  <code>{proposalOutput.evaluationReport}</code>
+                </pre>
+              ) : (
+                <p className="empty-plan-copy">No evaluation report was returned for this proposal output.</p>
+              )}
+            </article>
+          </div>
+
+          <div className="proposal-evidence-grid">
+            <article className="related-card">
+              <div className="preview-label">
+                <AlertTriangle size={16} aria-hidden="true" />
+                <span>Remaining Questions</span>
+              </div>
+              {proposalOutput.questions?.length ? (
+                <ul className="blueprint-list checklist-list">
+                  {proposalOutput.questions.map((question) => (
+                    <li key={question}>{question}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="empty-plan-copy">No remaining questions were returned for this proposal output.</p>
+              )}
+            </article>
+
+            <article className="related-card">
+              <div className="preview-label">
+                <RefreshCw size={16} aria-hidden="true" />
+                <span>Generation Evidence</span>
+              </div>
+              {transcriptEntry?.runMessage ? <p>{transcriptEntry.runMessage}</p> : <p className="empty-plan-copy">No generation summary was saved for this run.</p>}
+              {transcriptEntry?.transcript ? (
+                <details className="transcript-details">
+                  <summary>View Step 7 transcript</summary>
+                  <div className="transcript-block-grid">
+                    <div>
+                      <strong>Prompt payload</strong>
+                      <pre>
+                        <code>{JSON.stringify(transcriptEntry.transcript.prompt || {}, null, 2)}</code>
+                      </pre>
+                    </div>
+                    <div>
+                      <strong>Raw response</strong>
+                      <pre>
+                        <code>{String(transcriptEntry.transcript.rawResponse || '').trim() || 'No raw response saved.'}</code>
+                      </pre>
+                    </div>
+                  </div>
+                </details>
+              ) : null}
+            </article>
           </div>
         </>
       ) : null}

@@ -27,6 +27,11 @@ export function renderProposalPdfBytes(latex, fallbackTitle = 'Research Proposal
   return buildPdf(pages);
 }
 
+export function estimateProposalPageCount(latex, fallbackTitle = 'Research Proposal') {
+  const document = parseProposalLatex(latex, fallbackTitle);
+  return paginateDocument(document).length;
+}
+
 function parseProposalLatex(source, fallbackTitle) {
   const completeSource = ensureCompleteLatexDocumentForParsing(source, fallbackTitle);
   const title = normalizeInlineLatex(extractCommandArgument(completeSource, 'title') || fallbackTitle) || fallbackTitle;

@@ -4,16 +4,14 @@ import CriticReviewCard from './CriticReviewCard.jsx';
 function CritiquePanel({
   critiqueError,
   critiqueGeneratedAt,
-  critiqueMode,
   critiquePanelResult,
   critiqueStale,
   critiqueStatus,
   onGenerate,
   onStartRevisionPlanning,
-  revisionPlanExists
+  revisionPlanExists,
+  sourceLabel
 }) {
-  const modeLabel = critiqueMode === 'api' ? 'Gemini' : critiqueMode === 'template' ? 'Template' : 'Waiting';
-
   return (
     <section className="critique-panel panel-card">
       <div className="panel-header-row">
@@ -22,7 +20,7 @@ function CritiquePanel({
           <h2>Multi-Agent Critique</h2>
           <p>This step simulates multiple proposal reviewers. Each critic evaluates a different dimension and ranks revision priorities.</p>
         </div>
-        <span className={critiqueMode ? 'mode-pill is-ready' : 'mode-pill'}>{modeLabel}</span>
+        <span className={sourceLabel !== 'Waiting' ? 'mode-pill is-ready' : 'mode-pill'}>{sourceLabel}</span>
       </div>
 
       <div className="action-row summary-actions">
@@ -110,16 +108,20 @@ function CritiquePanel({
                 <span>Highest-Priority Issues</span>
               </div>
               <div className="critique-priority-list">
-                {critiquePanelResult.highestPriorityIssues.map((issue) => (
-                  <article className="critique-priority-item" key={issue.id}>
-                    <div className="critique-issue-topline">
-                      <span className={`priority-badge ${priorityTone(issue.priority)}`}>{issue.priority}</span>
-                      <span className="issue-critic-chip">{issue.criticName}</span>
-                    </div>
-                    <h4>{issue.issue}</h4>
-                    <p>{issue.suggestedRevision}</p>
-                  </article>
-                ))}
+                {critiquePanelResult.highestPriorityIssues.length ? (
+                  critiquePanelResult.highestPriorityIssues.map((issue) => (
+                    <article className="critique-priority-item" key={issue.id}>
+                      <div className="critique-issue-topline">
+                        <span className={`priority-badge ${priorityTone(issue.priority)}`}>{issue.priority}</span>
+                        <span className="issue-critic-chip">{issue.criticName}</span>
+                      </div>
+                      <h4>{issue.issue}</h4>
+                      <p>{issue.suggestedRevision}</p>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-plan-copy">No high-priority issues were returned in this critique pass.</p>
+                )}
               </div>
             </article>
           </div>
@@ -129,11 +131,15 @@ function CritiquePanel({
               <ArrowRight size={16} aria-hidden="true" />
               <span>Suggested Revision Order</span>
             </div>
-            <ol className="revision-order-list">
-              {critiquePanelResult.suggestedRevisionOrder.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
+            {critiquePanelResult.suggestedRevisionOrder.length ? (
+              <ol className="revision-order-list">
+                {critiquePanelResult.suggestedRevisionOrder.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            ) : (
+              <p className="empty-plan-copy">No revision order was needed for this critique pass.</p>
+            )}
           </article>
 
           <div className="critic-review-stack">

@@ -10,9 +10,10 @@ import ProposalOutputPanel from './components/ProposalOutputPanel.jsx';
 import RelatedWorkPlanPanel from './components/RelatedWorkPlanPanel.jsx';
 import RevisionPlanningPanel from './components/RevisionPlanningPanel.jsx';
 import WorkflowProgressRail from './components/WorkflowProgressRail.jsx';
+import { getApiBaseCandidatesForEnvironment } from '../shared/apiBaseCandidates.js';
 import { renderProposalPdfBytes } from '../shared/proposalPdfRenderer.js';
 
-const MEMORY_KEY = 'ai-proposal-studio-stage1-memory-v2';
+const MEMORY_KEY = 'ai-proposal-studio-stage2-memory-v3';
 
 const WORKFLOW_STEPS = [
   {
@@ -110,8 +111,11 @@ function App() {
   const [isEditingIdea, setIsEditingIdea] = useState(true);
   const [ideaInput, setIdeaInput] = useState(EMPTY_IDEA_INPUT);
   const [ideaPreview, setIdeaPreview] = useState(null);
+  const [agentSession, setAgentSession] = useState(null);
+  const [agentQuestionDrafts, setAgentQuestionDrafts] = useState({});
   const [analysisMode, setAnalysisMode] = useState(null);
   const [lastAnalyzedAt, setLastAnalyzedAt] = useState('');
+  const [stepTranscripts, setStepTranscripts] = useState({});
   const [errors, setErrors] = useState({});
   const [intakeStatus, setIntakeStatus] = useState('idle');
   const [proposalBlueprint, setProposalBlueprint] = useState(null);
@@ -243,60 +247,110 @@ function App() {
     return index >= 0 ? index + 1 : 1;
   }, [activeStep]);
 
+  const ideaIntakeEvidence = stepTranscripts['idea-intake'] || null;
+  const blueprintEvidence = stepTranscripts['proposal-blueprint'] || null;
+  const relatedWorkEvidence = stepTranscripts['related-work'] || null;
+  const critiqueEvidence = stepTranscripts['multi-agent-critique'] || null;
+  const applyRevisionsEvidence = stepTranscripts['apply-revisions'] || null;
+  const proposalOutputEvidence = stepTranscripts['proposal-output'] || null;
+
+  const ideaIntakeSourceLabel = formatSourceLabel(analysisMode, ideaIntakeEvidence?.provider);
+  const blueprintSourceLabel = formatSourceLabel(blueprintMode, blueprintEvidence?.provider);
+  const relatedWorkSourceLabel = formatSourceLabel(relatedWorkMode, relatedWorkEvidence?.provider);
+  const critiqueSourceLabel = formatSourceLabel(critiqueMode, critiqueEvidence?.provider);
+  const applyRevisionsSourceLabel = formatSourceLabel(applyRevisionsMode, applyRevisionsEvidence?.provider);
+  const proposalOutputSourceLabel = formatSourceLabel(proposalOutputMode, proposalOutputEvidence?.provider);
+
+  function applyWorkspaceSnapshot(snapshot) {
+    setActiveStep(normalizeActiveStep(snapshot.activeStep));
+    setIsEditingIdea(Boolean(snapshot.isEditingIdea));
+    setIdeaInput({ ...EMPTY_IDEA_INPUT, ...(snapshot.ideaInput || {}) });
+    setIdeaPreview(snapshot.ideaPreview || null);
+    setAgentSession(snapshot.agentSession || null);
+    setAgentQuestionDrafts(snapshot.agentQuestionDrafts || {});
+    setAnalysisMode(snapshot.analysisMode || null);
+    setLastAnalyzedAt(snapshot.lastAnalyzedAt || '');
+    setStepTranscripts(snapshot.stepTranscripts || {});
+    setProposalBlueprint(snapshot.proposalBlueprint || null);
+    setCurrentDraftBlueprint(snapshot.currentDraftBlueprint || null);
+    setBlueprintMode(snapshot.blueprintMode || null);
+    setBlueprintGeneratedAt(snapshot.blueprintGeneratedAt || '');
+    setBlueprintStale(Boolean(snapshot.blueprintStale));
+    setRelatedWorkPlan(snapshot.relatedWorkPlan || null);
+    setRelatedWorkMode(snapshot.relatedWorkMode || null);
+    setRelatedWorkGeneratedAt(snapshot.relatedWorkGeneratedAt || '');
+    setRelatedWorkStale(Boolean(snapshot.relatedWorkStale));
+    setCritiquePanelResult(snapshot.critiquePanelResult || null);
+    setCritiqueMode(snapshot.critiqueMode || null);
+    setCritiqueGeneratedAt(snapshot.critiqueGeneratedAt || '');
+    setCritiqueStale(Boolean(snapshot.critiqueStale));
+    setRevisionSuggestions(Array.isArray(snapshot.revisionSuggestions) ? snapshot.revisionSuggestions : []);
+    setRevisionPlan(snapshot.revisionPlan || null);
+    setRevisionPlanStale(Boolean(snapshot.revisionPlanStale));
+    setRevisionPlanUpdatedAt(snapshot.revisionPlanUpdatedAt || '');
+    setRevisionPreview(snapshot.revisionPreview || null);
+    setProposalVersions(Array.isArray(snapshot.proposalVersions) ? snapshot.proposalVersions : []);
+    setCurrentVersionId(snapshot.currentVersionId || '');
+    setVersionComparison(snapshot.versionComparison || null);
+    setSelectedComparison(snapshot.selectedComparison || null);
+    setApplyRevisionsMode(snapshot.applyRevisionsMode || null);
+    setApplyRevisionsGeneratedAt(snapshot.applyRevisionsGeneratedAt || '');
+    setRevisionApplicationStale(Boolean(snapshot.revisionApplicationStale));
+    setProposalOutput(snapshot.proposalOutput || null);
+    setProposalOutputMode(snapshot.proposalOutputMode || null);
+    setProposalOutputGeneratedAt(snapshot.proposalOutputGeneratedAt || '');
+    setProposalOutputStale(Boolean(snapshot.proposalOutputStale));
+    setProposalOutputTab(snapshot.proposalOutputTab === 'latex' ? 'latex' : 'pdf');
+    setNotice(snapshot.notice || '');
+    setError('');
+  }
+
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(MEMORY_KEY);
+    let cancelled = false;
 
-      if (!raw) {
-        setMemoryReady(true);
-        return;
+    (async () => {
+      try {
+        const searchParams = typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search);
+        const autoloadSnapshot = searchParams.get('autoloadSnapshot');
+
+        if (autoloadSnapshot) {
+          const response = await fetch(`/${autoloadSnapshot}`);
+
+          if (!response.ok) {
+            throw new Error(`Snapshot load failed with ${response.status}.`);
+          }
+
+          const snapshot = await response.json();
+
+          if (cancelled) return;
+
+          applyWorkspaceSnapshot(snapshot);
+          localStorage.setItem(MEMORY_KEY, JSON.stringify(snapshot));
+          return;
+        }
+
+        const raw = localStorage.getItem(MEMORY_KEY);
+
+        if (!raw) {
+          return;
+        }
+
+        applyWorkspaceSnapshot(JSON.parse(raw));
+      } catch {
+        if (!cancelled) {
+          setError('Saved workspace data could not be loaded. Resetting to a clean workspace.');
+          localStorage.removeItem(MEMORY_KEY);
+        }
+      } finally {
+        if (!cancelled) {
+          setMemoryReady(true);
+        }
       }
+    })();
 
-      const snapshot = JSON.parse(raw);
-      setActiveStep(normalizeActiveStep(snapshot.activeStep));
-      setIsEditingIdea(Boolean(snapshot.isEditingIdea));
-      setIdeaInput({ ...EMPTY_IDEA_INPUT, ...(snapshot.ideaInput || {}) });
-      setIdeaPreview(snapshot.ideaPreview || null);
-      setAnalysisMode(snapshot.analysisMode || null);
-      setLastAnalyzedAt(snapshot.lastAnalyzedAt || '');
-      setProposalBlueprint(snapshot.proposalBlueprint || null);
-      setCurrentDraftBlueprint(null);
-      setBlueprintMode(snapshot.blueprintMode || null);
-      setBlueprintGeneratedAt(snapshot.blueprintGeneratedAt || '');
-      setBlueprintStale(Boolean(snapshot.blueprintStale));
-      setRelatedWorkPlan(snapshot.relatedWorkPlan || null);
-      setRelatedWorkMode(snapshot.relatedWorkMode || null);
-      setRelatedWorkGeneratedAt(snapshot.relatedWorkGeneratedAt || '');
-      setRelatedWorkStale(Boolean(snapshot.relatedWorkStale));
-      setCritiquePanelResult(snapshot.critiquePanelResult || null);
-      setCritiqueMode(snapshot.critiqueMode || null);
-      setCritiqueGeneratedAt(snapshot.critiqueGeneratedAt || '');
-      setCritiqueStale(Boolean(snapshot.critiqueStale));
-      setRevisionSuggestions(Array.isArray(snapshot.revisionSuggestions) ? snapshot.revisionSuggestions : []);
-      setRevisionPlan(snapshot.revisionPlan || null);
-      setRevisionPlanStale(Boolean(snapshot.revisionPlanStale));
-      setRevisionPlanUpdatedAt(snapshot.revisionPlanUpdatedAt || '');
-      setRevisionPreview(null);
-      setProposalVersions(Array.isArray(snapshot.proposalVersions) ? snapshot.proposalVersions : []);
-      setCurrentVersionId(snapshot.currentVersionId || '');
-      setVersionComparison(snapshot.versionComparison || null);
-      setSelectedComparison(snapshot.selectedComparison || null);
-      setApplyRevisionsMode(snapshot.applyRevisionsMode || null);
-      setApplyRevisionsGeneratedAt(snapshot.applyRevisionsGeneratedAt || '');
-      setRevisionApplicationStale(Boolean(snapshot.revisionApplicationStale));
-      setProposalOutput(snapshot.proposalOutput || null);
-      setProposalOutputMode(snapshot.proposalOutputMode || null);
-      setProposalOutputGeneratedAt(snapshot.proposalOutputGeneratedAt || '');
-      setProposalOutputStale(Boolean(snapshot.proposalOutputStale));
-      setProposalOutputTab(snapshot.proposalOutputTab === 'latex' ? 'latex' : 'pdf');
-      setNotice(snapshot.notice || '');
-      setError('');
-    } catch {
-      setError('Saved workspace data could not be loaded. Resetting to a clean workspace.');
-      localStorage.removeItem(MEMORY_KEY);
-    } finally {
-      setMemoryReady(true);
-    }
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -306,14 +360,18 @@ function App() {
       !hasWorkspaceContent(
         ideaInput,
         ideaPreview,
+        agentSession,
         proposalBlueprint,
+        currentDraftBlueprint,
         relatedWorkPlan,
         critiquePanelResult,
         revisionSuggestions,
         revisionPlan,
+        revisionPreview,
         proposalVersions,
         versionComparison,
-        proposalOutput
+        proposalOutput,
+        stepTranscripts
       )
     ) {
       localStorage.removeItem(MEMORY_KEY);
@@ -325,9 +383,13 @@ function App() {
       isEditingIdea,
       ideaInput,
       ideaPreview,
+      agentSession,
+      agentQuestionDrafts,
       analysisMode,
       lastAnalyzedAt,
+      stepTranscripts,
       proposalBlueprint,
+      currentDraftBlueprint,
       blueprintMode,
       blueprintGeneratedAt,
       blueprintStale,
@@ -343,6 +405,7 @@ function App() {
       revisionPlan,
       revisionPlanStale,
       revisionPlanUpdatedAt,
+      revisionPreview,
       proposalVersions,
       currentVersionId,
       versionComparison,
@@ -361,6 +424,8 @@ function App() {
     localStorage.setItem(MEMORY_KEY, JSON.stringify(snapshot));
   }, [
     activeStep,
+    agentQuestionDrafts,
+    agentSession,
     analysisMode,
     blueprintGeneratedAt,
     blueprintMode,
@@ -393,9 +458,11 @@ function App() {
     revisionApplicationStale,
     revisionPlanStale,
     revisionPlanUpdatedAt,
+    revisionPreview,
     revisionSuggestions,
     proposalVersions,
     selectedComparison,
+    stepTranscripts,
     versionComparison
   ]);
 
@@ -465,11 +532,108 @@ function App() {
     setIsEditingIdea(stepId === 'idea-intake' ? isEditingIdea : false);
   }
 
+  function recordStepTranscript(stepId, data, savedAt = new Date().toISOString()) {
+    setStepTranscripts((current) => ({
+      ...current,
+      [stepId]: {
+        mode: clean(data?.mode),
+        provider: clean(data?.provider),
+        transcript: data?.transcript || null,
+        updates: Array.isArray(data?.updates) ? data.updates.map(clean).filter(Boolean) : [],
+        runMessage: clean(data?.runMessage),
+        savedAt
+      }
+    }));
+  }
+
+  function applyIdeaAgentResult(data, normalizedInput, generatedAt = new Date().toISOString()) {
+    const nextSession = {
+      project: data?.project || {},
+      suggestedProject: data?.suggestedProject || data?.project || {},
+      checklist: Array.isArray(data?.checklist) ? data.checklist : [],
+      fieldSuggestions: Array.isArray(data?.fieldSuggestions) ? data.fieldSuggestions : [],
+      decisions: Array.isArray(data?.decisions) ? data.decisions : [],
+      questions: Array.isArray(data?.questions) ? data.questions : [],
+      inputSummary: data?.inputSummary || null,
+      updates: Array.isArray(data?.updates) ? data.updates.map(clean).filter(Boolean) : [],
+      runMessage: clean(data?.runMessage),
+      mode: clean(data?.mode),
+      provider: clean(data?.provider)
+    };
+
+    setIdeaInput(normalizedInput);
+    setAgentSession(nextSession);
+    setAgentQuestionDrafts((current) => pruneQuestionDrafts(current, nextSession.questions));
+    setIdeaPreview(buildIdeaPreviewFromAgentSession(normalizedInput, nextSession));
+    setAnalysisMode(nextSession.mode || null);
+    setLastAnalyzedAt(generatedAt);
+    recordStepTranscript('idea-intake', data, generatedAt);
+    setActiveStep('idea-intake');
+    setIsEditingIdea(false);
+    setIntakeStatus('idle');
+    setBlueprintStale(Boolean(proposalBlueprint));
+    setCurrentDraftBlueprint(null);
+    setRelatedWorkStale(Boolean(relatedWorkPlan));
+    setCritiqueStale(Boolean(critiquePanelResult));
+    setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
+    setRevisionApplicationStale(Boolean(revisionPreview));
+    setProposalOutputStale(Boolean(proposalOutput));
+    setNotice(
+      proposalBlueprint
+        ? 'Step 1 updated. Step 2 is now stale, and Steps 3 through 7 stay locked until you regenerate each step in order again.'
+        : nextSession.questions.length
+          ? 'Step 1 complete. Review the agent suggestions or answer the remaining questions before moving on to Step 2.'
+          : 'Step 1 complete. Generate the proposal blueprint to move into Step 2.'
+    );
+  }
+
+  async function submitAgentAnswer(question, answer) {
+    if (!agentSession?.project) {
+      setNotice('Start Step 1 analysis first so the agent has a project state to update.');
+      return;
+    }
+
+    const normalizedAnswer = clean(answer);
+
+    if (!normalizedAnswer) {
+      setError('Step 1 answer is required before the agent can update the project state.');
+      return;
+    }
+
+    const nextIdeaInput = normalizeIdeaInput(syncIdeaInputFromAgentField(ideaInput, question?.field, normalizedAnswer));
+
+    setIntakeStatus('answering');
+    setError('');
+    setBlueprintError('');
+    setRelatedWorkError('');
+    setCritiqueError('');
+    setApplyRevisionsError('');
+    setProposalOutputError('');
+
+    try {
+      const data = await postJson('/api/agent/answer', {
+        project: agentSession.project,
+        question,
+        answer: normalizedAnswer,
+        requirements: Array.isArray(agentSession.checklist) ? agentSession.checklist.join('\n') : undefined
+      });
+
+      applyIdeaAgentResult(data, nextIdeaInput, new Date().toISOString());
+    } catch (requestError) {
+      setIntakeStatus('error');
+      setActiveStep('idea-intake');
+      setIsEditingIdea(true);
+      setError(`Step 1 update failed. ${readError(requestError)}`);
+      setNotice('The previous Step 1 session is still saved. Try again or continue editing the intake.');
+    }
+  }
+
   function handleFieldChange(field, value) {
     setIdeaInput((current) => ({
       ...current,
       [field]: value
     }));
+    setIntakeStatus('idle');
 
     if (errors[field]) {
       setErrors((current) => {
@@ -496,8 +660,11 @@ function App() {
     setIsEditingIdea(true);
     setIdeaInput(SAMPLE_IDEA_INPUT);
     setIdeaPreview(null);
+    setAgentSession(null);
+    setAgentQuestionDrafts({});
     setAnalysisMode(null);
     setLastAnalyzedAt('');
+    setStepTranscripts({});
     setProposalBlueprint(null);
     setCurrentDraftBlueprint(null);
     setBlueprintMode(null);
@@ -541,7 +708,7 @@ function App() {
     setProposalPdfUrl('');
     setErrors({});
     setError('');
-    setNotice('Sample idea loaded. Analyze it to generate the Step 1 preview.');
+    setNotice('Sample idea loaded. Analyze it to start the real Step 1 agent session.');
   }
 
   function handleReset() {
@@ -549,8 +716,11 @@ function App() {
     setIsEditingIdea(true);
     setIdeaInput(EMPTY_IDEA_INPUT);
     setIdeaPreview(null);
+    setAgentSession(null);
+    setAgentQuestionDrafts({});
     setAnalysisMode(null);
     setLastAnalyzedAt('');
+    setStepTranscripts({});
     setProposalBlueprint(null);
     setCurrentDraftBlueprint(null);
     setBlueprintMode(null);
@@ -591,6 +761,7 @@ function App() {
     setProposalOutputGeneratedAt('');
     setProposalOutputStale(false);
     setProposalOutputTab('pdf');
+    setIntakeStatus('idle');
     setProposalPdfUrl('');
     setErrors({});
     setError('');
@@ -609,7 +780,7 @@ function App() {
     setNotice(proposalBlueprint ? 'Edit the idea intake, then re-analyze Step 1. After that, Step 2 becomes stale and the rest of the pipeline must be redone in order.' : '');
   }
 
-  function handleAnalyzeIdea() {
+  async function handleAnalyzeIdea() {
     const normalizedInput = normalizeIdeaInput(ideaInput);
     const validationErrors = validateIdeaInput(normalizedInput);
 
@@ -620,37 +791,66 @@ function App() {
     setCritiqueError('');
 
     if (Object.keys(validationErrors).length) {
-      setIdeaPreview(null);
-      setAnalysisMode(null);
       setActiveStep('idea-intake');
       setIsEditingIdea(true);
-      setNotice('Fill the required research fields before generating the preview.');
+      setIntakeStatus('error');
+      setNotice('Fill the required research fields before starting the Step 1 agent session.');
       return;
     }
 
-    const templatePreview = buildTemplatePreview(normalizedInput);
-    const analyzedAt = new Date().toISOString();
-
     setIntakeStatus('analyzing');
-    setIdeaInput(normalizedInput);
-    setIdeaPreview(templatePreview);
-    setAnalysisMode('template');
-    setLastAnalyzedAt(analyzedAt);
-    setActiveStep('idea-intake');
-    setIsEditingIdea(false);
-    setBlueprintStale(Boolean(proposalBlueprint));
-    setCurrentDraftBlueprint(null);
-    setRelatedWorkStale(Boolean(relatedWorkPlan));
-    setCritiqueStale(Boolean(critiquePanelResult));
-    setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
-    setRevisionApplicationStale(Boolean(revisionPreview));
-    setProposalOutputStale(Boolean(proposalOutput));
-    setNotice(
-      proposalBlueprint
-        ? 'Step 1 updated. Step 2 is now stale, and Steps 3 through 7 stay locked until you regenerate each step in order again.'
-        : 'Step 1 complete. Generate the proposal blueprint to move into Step 2.'
+
+    try {
+      const data = await postJson('/api/agent/start', {
+        ideaInput: normalizedInput,
+        topic: normalizedInput.topic
+      });
+
+      applyIdeaAgentResult(data, normalizedInput, new Date().toISOString());
+    } catch (requestError) {
+      setIntakeStatus('error');
+      setActiveStep('idea-intake');
+      setIsEditingIdea(true);
+      setError(`Step 1 analysis failed. ${readError(requestError)}`);
+      setNotice('The current intake is still saved locally. Try the Step 1 analysis again once the server is available.');
+    }
+  }
+
+  function handleQuestionDraftChange(questionId, value) {
+    setAgentQuestionDrafts((current) => ({
+      ...current,
+      [questionId]: value
+    }));
+  }
+
+  function handleApplyFieldSuggestion(suggestion) {
+    submitAgentAnswer(
+      {
+        id: `${suggestion.field}-suggestion`,
+        field: suggestion.field,
+        question: `Apply the suggested ${suggestion.label || suggestion.field}?`,
+        reason: suggestion.reason || 'Applying the agent suggestion.',
+        priority: suggestion.confidence || 'Medium'
+      },
+      suggestion.value
     );
-    setIntakeStatus('idle');
+  }
+
+  function handleSelectDecision(decision, option) {
+    submitAgentAnswer(
+      {
+        id: decision.id,
+        field: decision.field,
+        question: decision.question,
+        reason: decision.title,
+        priority: 'High'
+      },
+      option.value
+    );
+  }
+
+  function handleSubmitQuestionAnswer(question) {
+    submitAgentAnswer(question, agentQuestionDrafts[question.id]);
   }
 
   async function handleGenerateProposalBlueprint() {
@@ -674,43 +874,34 @@ function App() {
         ideaInput,
         ideaPreview
       });
+      const nextBlueprint = data.blueprint || null;
+      const generatedAt = new Date().toISOString();
 
-      setProposalBlueprint(data.blueprint || null);
+      if (!nextBlueprint) {
+        throw new Error('The server returned no proposal blueprint.');
+      }
+
+      setProposalBlueprint(nextBlueprint);
       setCurrentDraftBlueprint(null);
-      setBlueprintMode(data.mode === 'api' ? 'api' : 'template');
-      setBlueprintGeneratedAt(new Date().toISOString());
+      setBlueprintMode(data.mode || null);
+      setBlueprintGeneratedAt(generatedAt);
       setBlueprintStale(false);
       setRelatedWorkStale(Boolean(relatedWorkPlan));
       setCritiqueStale(Boolean(critiquePanelResult));
       setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
       setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
+      recordStepTranscript('proposal-blueprint', data, generatedAt);
       setBlueprintStatus('idle');
       setNotice(
         relatedWorkPlan
           ? 'Step 2 updated. Step 3 must be regenerated next, and Steps 4 through 7 stay locked until you redo them in order.'
-          : data.mode === 'api'
-            ? 'Proposal blueprint generated with Gemini and saved as Step 2.'
-            : 'Proposal blueprint generated from the deterministic Stage 1 fallback.'
+          : 'Proposal blueprint generated and saved as Step 2.'
       );
     } catch (requestError) {
-      const fallbackBlueprint = buildClientFallbackBlueprint(ideaInput, ideaPreview);
-
-      setProposalBlueprint(fallbackBlueprint);
-      setCurrentDraftBlueprint(null);
-      setBlueprintMode('template');
-      setBlueprintGeneratedAt(new Date().toISOString());
-      setBlueprintStale(false);
-      setRelatedWorkStale(Boolean(relatedWorkPlan));
-      setCritiqueStale(Boolean(critiquePanelResult));
-      setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
-      setRevisionApplicationStale(Boolean(revisionPreview));
-      setProposalOutputStale(Boolean(proposalOutput));
-      setBlueprintStatus('idle');
-      setBlueprintError('');
-      setNotice(
-        `Blueprint API was unavailable, so the app used the deterministic demo fallback instead. ${readError(requestError)}`
-      );
+      setBlueprintStatus('error');
+      setBlueprintError(readError(requestError));
+      setNotice('Step 2 could not be generated. The previous blueprint, if any, is still saved.');
     }
   }
 
@@ -739,41 +930,33 @@ function App() {
         ideaInput,
         proposalBlueprint
       });
+      const nextPlan = data.relatedWorkPlan || null;
+      const generatedAt = new Date().toISOString();
 
-      setRelatedWorkPlan(data.relatedWorkPlan || null);
+      if (!nextPlan) {
+        throw new Error('The server returned no related work plan.');
+      }
+
+      setRelatedWorkPlan(nextPlan);
       setCurrentDraftBlueprint(null);
-      setRelatedWorkMode(data.mode === 'api' ? 'api' : 'template');
-      setRelatedWorkGeneratedAt(new Date().toISOString());
+      setRelatedWorkMode(data.mode || null);
+      setRelatedWorkGeneratedAt(generatedAt);
       setRelatedWorkStale(false);
       setCritiqueStale(Boolean(critiquePanelResult));
       setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
       setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
+      recordStepTranscript('related-work', data, generatedAt);
       setRelatedWorkStatus('idle');
       setNotice(
         critiquePanelResult
           ? 'Step 3 updated. Step 4 must be regenerated next, and Steps 5 through 7 stay locked until you redo them in order.'
-          : data.mode === 'api'
-            ? 'Related work plan generated with Gemini and saved as Step 3.'
-            : 'Related work plan generated from the deterministic Stage 1 fallback.'
+          : 'Related work plan generated and saved as Step 3.'
       );
     } catch (requestError) {
-      const fallbackPlan = buildClientFallbackRelatedWorkPlan(ideaInput, proposalBlueprint);
-
-      setRelatedWorkPlan(fallbackPlan);
-      setCurrentDraftBlueprint(null);
-      setRelatedWorkMode('template');
-      setRelatedWorkGeneratedAt(new Date().toISOString());
-      setRelatedWorkStale(false);
-      setCritiqueStale(Boolean(critiquePanelResult));
-      setRevisionPlanStale(Boolean(revisionSuggestions.length || revisionPlan));
-      setRevisionApplicationStale(Boolean(revisionPreview));
-      setProposalOutputStale(Boolean(proposalOutput));
-      setRelatedWorkStatus('idle');
-      setRelatedWorkError('');
-      setNotice(
-        `Related-work API was unavailable, so the app used the deterministic demo fallback instead. ${readError(requestError)}`
-      );
+      setRelatedWorkStatus('error');
+      setRelatedWorkError(readError(requestError));
+      setNotice('Step 3 could not be generated. The previous related work plan, if any, is still saved.');
     }
   }
 
@@ -809,11 +992,16 @@ function App() {
       });
       const generatedAt = new Date().toISOString();
       const nextCritique = data.critiquePanelResult || null;
+
+      if (!nextCritique) {
+        throw new Error('The server returned no critique result.');
+      }
+
       const nextSuggestions = buildRevisionSuggestionsFromCritique(nextCritique);
 
       setCritiquePanelResult(nextCritique);
       setCurrentDraftBlueprint(null);
-      setCritiqueMode(data.mode === 'api' ? 'api' : 'template');
+      setCritiqueMode(data.mode || null);
       setCritiqueGeneratedAt(generatedAt);
       setCritiqueStale(false);
       setRevisionSuggestions(nextSuggestions);
@@ -822,33 +1010,13 @@ function App() {
       setRevisionPlanUpdatedAt(generatedAt);
       setRevisionApplicationStale(Boolean(revisionPreview));
       setProposalOutputStale(Boolean(proposalOutput));
+      recordStepTranscript('multi-agent-critique', data, generatedAt);
       setCritiqueStatus('idle');
-      setNotice(
-        data.mode === 'api'
-          ? 'Multi-agent critique generated with Gemini and saved as Step 4. Step 5 is ready for accept, reject, or defer decisions.'
-          : 'Multi-agent critique generated from the deterministic Stage 1 fallback. Step 5 is ready for revision decisions.'
-      );
+      setNotice('Multi-agent critique generated and saved as Step 4. Step 5 is ready for accept, reject, or defer decisions.');
     } catch (requestError) {
-      const fallbackCritique = buildClientFallbackCritiquePanelResult(ideaInput, proposalBlueprint, relatedWorkPlan);
-      const generatedAt = new Date().toISOString();
-      const nextSuggestions = buildRevisionSuggestionsFromCritique(fallbackCritique);
-
-      setCritiquePanelResult(fallbackCritique);
-      setCurrentDraftBlueprint(null);
-      setCritiqueMode('template');
-      setCritiqueGeneratedAt(generatedAt);
-      setCritiqueStale(false);
-      setRevisionSuggestions(nextSuggestions);
-      setRevisionPlan(buildRevisionPlan(nextSuggestions));
-      setRevisionPlanStale(false);
-      setRevisionPlanUpdatedAt(generatedAt);
-      setRevisionApplicationStale(Boolean(revisionPreview));
-      setProposalOutputStale(Boolean(proposalOutput));
-      setCritiqueStatus('idle');
-      setCritiqueError('');
-      setNotice(
-        `Critique API was unavailable, so the app used the deterministic demo fallback instead. ${readError(requestError)}`
-      );
+      setCritiqueStatus('error');
+      setCritiqueError(readError(requestError));
+      setNotice('Step 4 could not be generated. The previous critique, if any, is still saved.');
     }
   }
 
@@ -955,17 +1123,15 @@ function App() {
         revisionPlan
       });
 
-      applyRevisionResultToState(data.applyRevisionResult || null, data.mode === 'api' ? 'api' : 'template');
+      applyRevisionResultToState(data.applyRevisionResult || null, data);
     } catch (requestError) {
-      const fallbackResult = buildClientFallbackApplyRevisionResult(proposalBlueprint, revisionPlan);
-      applyRevisionResultToState(fallbackResult, 'template');
-      setNotice(
-        `Revision API was unavailable, so the app used the deterministic demo fallback instead. ${readError(requestError)}`
-      );
+      setApplyRevisionsStatus('error');
+      setApplyRevisionsError(readError(requestError));
+      setNotice('Step 6 could not be generated. The previous revised draft, if any, is still saved.');
     }
   }
 
-  function applyRevisionResultToState(applyRevisionResult, mode) {
+  function applyRevisionResultToState(applyRevisionResult, data) {
     if (!applyRevisionResult?.revisedBlueprint) {
       setApplyRevisionsStatus('error');
       setApplyRevisionsError('No revised blueprint was returned.');
@@ -984,17 +1150,14 @@ function App() {
     setRevisionPreview(nextPreview);
     setRelatedWorkError('');
     setCritiqueError('');
-    setApplyRevisionsMode(mode);
+    setApplyRevisionsMode(data?.mode || null);
     setApplyRevisionsGeneratedAt(generatedAt);
     setRevisionApplicationStale(false);
     setProposalOutputStale(true);
+    recordStepTranscript('apply-revisions', data, generatedAt);
     setApplyRevisionsStatus('idle');
     setApplyRevisionsError('');
-    setNotice(
-      mode === 'api'
-        ? 'Accepted revisions applied with Gemini. Review Step 6, then generate Step 7 to save this updated proposal as a new version.'
-        : 'Accepted revisions applied from the deterministic Stage 1 fallback. Review Step 6, then generate Step 7 to save this updated proposal as a new version.'
-    );
+    setNotice('Accepted revisions applied. Review Step 6, then generate Step 7 to save this updated proposal as a new version.');
   }
 
   async function handleGenerateProposalOutput() {
@@ -1035,10 +1198,16 @@ function App() {
       const data = await postJson('/api/proposal', payload);
       const normalizedOutput = normalizeProposalOutputResult(data, ideaInput, currentDraftBlueprint, payload.title);
       const nextOutput = normalizedOutput.output;
+      const generatedAt = new Date().toISOString();
+
+      if (!nextOutput?.proposalLatex) {
+        throw new Error('The server returned no proposal LaTeX output.');
+      }
+
       const nextVersionSet = createFinalVersionSet({
         critiquePanelResult,
         existingVersions: proposalVersions,
-        generatedAt: new Date().toISOString(),
+        generatedAt,
         revisionPlan,
         revisedBlueprint: currentDraftBlueprint,
         revisionPreview
@@ -1053,48 +1222,18 @@ function App() {
       setCurrentVersionId(nextVersionSet.currentVersionId);
       setSelectedComparison(nextVersionSet.selectedComparison);
       setVersionComparison(nextVersionSet.versionComparison);
+      recordStepTranscript('proposal-output', data, generatedAt);
       try {
         await refreshProposalPdf(nextOutput.proposalLatex, nextOutput.title, true);
       } catch {
         setProposalOutputTab('latex');
       }
       setProposalOutputStatus('idle');
-      setNotice(
-        data.mode === 'api'
-          ? 'Proposal output generated with Gemini. A new finalized proposal version has been saved in history.'
-          : 'Proposal output generated from the deterministic fallback. A new finalized proposal version has been saved in history.'
-      );
+      setNotice('Proposal output generated. A new finalized proposal version has been saved in history.');
     } catch (requestError) {
-      const fallbackOutput = buildClientFallbackProposalOutput(ideaInput, currentDraftBlueprint);
-      const nextVersionSet = createFinalVersionSet({
-        critiquePanelResult,
-        existingVersions: proposalVersions,
-        generatedAt: new Date().toISOString(),
-        revisionPlan,
-        revisedBlueprint: currentDraftBlueprint,
-        revisionPreview
-      });
-
-      setProposalOutput(fallbackOutput);
-      setProposalOutputMode('template');
-      setProposalOutputGeneratedAt(nextVersionSet.generatedAt);
-      setProposalOutputStale(false);
-      setProposalOutputTab('latex');
-      setProposalVersions(nextVersionSet.versions);
-      setCurrentVersionId(nextVersionSet.currentVersionId);
-      setSelectedComparison(nextVersionSet.selectedComparison);
-      setVersionComparison(nextVersionSet.versionComparison);
-
-      try {
-        await refreshProposalPdf(fallbackOutput.proposalLatex, fallbackOutput.title, true);
-      } catch {
-        setProposalOutputTab('latex');
-      }
-
-      setProposalOutputStatus('idle');
-      setNotice(
-        `Proposal generation API was unavailable, so the app used the deterministic document fallback instead. ${readError(requestError)}`
-      );
+      setProposalOutputStatus('error');
+      setProposalOutputError(readError(requestError));
+      setNotice('Step 7 could not be generated. The previous proposal output, if any, is still saved.');
     }
   }
 
@@ -1216,23 +1355,32 @@ function App() {
           {activeStep === 'idea-intake' && showingEditor ? (
             <div className="workspace-grid">
               <IdeaIntakeScreen
+                agentQuestionDrafts={agentQuestionDrafts}
+                agentSession={agentSession}
                 completedFieldCount={completedFieldCount}
                 errors={errors}
                 hasPreview={Boolean(ideaPreview)}
                 ideaInput={ideaInput}
                 onAnalyze={handleAnalyzeIdea}
+                onApplyFieldSuggestion={handleApplyFieldSuggestion}
                 onFieldChange={handleFieldChange}
                 onLoadSample={handleLoadSample}
+                onQuestionDraftChange={handleQuestionDraftChange}
                 onReset={handleReset}
+                onSelectDecision={handleSelectDecision}
+                onSubmitQuestionAnswer={handleSubmitQuestionAnswer}
+                sourceLabel={ideaIntakeSourceLabel}
                 status={intakeStatus}
               />
 
               <IdeaPreviewPanel
-                analysisMode={analysisMode}
+                agentSession={agentSession}
                 ideaInput={ideaInput}
                 ideaPreview={ideaPreview}
                 lastAnalyzedAt={lastAnalyzedAt}
+                sourceLabel={ideaIntakeSourceLabel}
                 status={intakeStatus}
+                transcriptEntry={ideaIntakeEvidence}
               />
             </div>
           ) : activeStep === 'idea-intake' ? (
@@ -1244,16 +1392,20 @@ function App() {
                 ideaInput={ideaInput}
                 ideaPreview={ideaPreview}
                 lastAnalyzedAt={lastAnalyzedAt}
+                openQuestionCount={agentSession?.questions?.length || 0}
                 onEdit={handleEditIdeaIntake}
                 onGenerateBlueprint={handleGenerateProposalBlueprint}
+                sourceLabel={ideaIntakeSourceLabel}
               />
 
               <IdeaPreviewPanel
-                analysisMode={analysisMode}
+                agentSession={agentSession}
                 ideaInput={ideaInput}
                 ideaPreview={ideaPreview}
                 lastAnalyzedAt={lastAnalyzedAt}
+                sourceLabel={ideaIntakeSourceLabel}
                 status={intakeStatus}
+                transcriptEntry={ideaIntakeEvidence}
               />
             </div>
           ) : activeStep === 'proposal-blueprint' ? (
@@ -1262,7 +1414,6 @@ function App() {
                 blueprint={proposalBlueprint}
                 blueprintError={blueprintError}
                 blueprintGeneratedAt={blueprintGeneratedAt}
-                blueprintMode={blueprintMode}
                 blueprintStatus={blueprintStatus}
                 blueprintStale={blueprintStale}
                 onGenerate={handleGenerateProposalBlueprint}
@@ -1270,6 +1421,7 @@ function App() {
                 relatedWorkPlanExists={Boolean(relatedWorkPlan)}
                 relatedWorkStale={relatedWorkStale}
                 relatedWorkStatus={relatedWorkStatus}
+                sourceLabel={blueprintSourceLabel}
               />
             </div>
           ) : activeStep === 'related-work' ? (
@@ -1281,22 +1433,22 @@ function App() {
               onRunCritique={handleRunCritique}
               relatedWorkError={relatedWorkError}
               relatedWorkGeneratedAt={relatedWorkGeneratedAt}
-              relatedWorkMode={relatedWorkMode}
               relatedWorkPlan={relatedWorkPlan}
               relatedWorkStale={relatedWorkStale}
               relatedWorkStatus={relatedWorkStatus}
+              sourceLabel={relatedWorkSourceLabel}
             />
           ) : activeStep === 'multi-agent-critique' ? (
             <CritiquePanel
               critiqueError={critiqueError}
               critiqueGeneratedAt={critiqueGeneratedAt}
-              critiqueMode={critiqueMode}
               critiquePanelResult={critiquePanelResult}
               critiqueStale={critiqueStale}
               critiqueStatus={critiqueStatus}
               onGenerate={handleRunCritique}
               onStartRevisionPlanning={handleStartRevisionPlanning}
               revisionPlanExists={Boolean(revisionSuggestions.length)}
+              sourceLabel={critiqueSourceLabel}
             />
           ) : activeStep === 'revision-planning' ? (
             <RevisionPlanningPanel
@@ -1317,7 +1469,6 @@ function App() {
             <ApplyRevisionsPanel
               applyRevisionsError={applyRevisionsError}
               applyRevisionsGeneratedAt={applyRevisionsGeneratedAt}
-              applyRevisionsMode={applyRevisionsMode}
               applyRevisionsStatus={applyRevisionsStatus}
               currentVersionId={currentVersionId}
               draftComparisonVersions={revisionPreview?.versions || []}
@@ -1332,6 +1483,7 @@ function App() {
               revisionApplicationStale={revisionApplicationStale}
               revisionPlan={revisionPlan}
               selectedComparison={selectedComparison}
+              sourceLabel={applyRevisionsSourceLabel}
               versionComparison={versionComparison}
             />
           ) : (
@@ -1342,13 +1494,14 @@ function App() {
               proposalOutput={proposalOutput}
               proposalOutputError={proposalOutputError}
               proposalOutputGeneratedAt={proposalOutputGeneratedAt}
-              proposalOutputMode={proposalOutputMode}
               proposalOutputStale={proposalOutputStale}
               proposalOutputStatus={proposalOutputStatus}
               proposalOutputTab={proposalOutputTab}
               proposalPdfUrl={proposalPdfUrl}
               proposalVersions={proposalVersions}
               revisionApplicationStale={revisionApplicationStale}
+              sourceLabel={proposalOutputSourceLabel}
+              transcriptEntry={proposalOutputEvidence}
             />
           )}
         </section>
@@ -1370,6 +1523,118 @@ function buildTemplatePreview(ideaInput) {
     possibleContribution: ideaInput.expectedContribution || inferContribution(ideaInput),
     missingInformation
   };
+}
+
+function buildIdeaPreviewFromAgentSession(ideaInput, agentSession) {
+  if (!agentSession) {
+    return buildTemplatePreview(ideaInput);
+  }
+
+  const project = agentSession.project || {};
+  const suggestedProject = agentSession.suggestedProject || {};
+  const suggestionsByField = Object.fromEntries(
+    (agentSession.fieldSuggestions || []).map((suggestion) => [suggestion.field, suggestion])
+  );
+  const projectTitle =
+    clean(suggestedProject.title) || clean(project.title) || clean(suggestionsByField.title?.value) || clean(ideaInput.topic);
+  const problem =
+    clean(project.problem) || clean(suggestedProject.problem) || clean(suggestionsByField.problem?.value) || clean(ideaInput.problem);
+  const method =
+    clean(project.method) || clean(suggestedProject.method) || clean(suggestionsByField.method?.value) || clean(ideaInput.methods);
+  const evaluationPlan =
+    clean(project.evaluation) || clean(suggestedProject.evaluation) || clean(suggestionsByField.evaluation?.value);
+  const timeline =
+    clean(project.timeline) || clean(suggestedProject.timeline) || clean(suggestionsByField.timeline?.value);
+  const resources =
+    clean(project.resources) || clean(suggestedProject.resources) || clean(suggestionsByField.resources?.value) || clean(ideaInput.datasets);
+  const references =
+    clean(project.references) || clean(suggestedProject.references) || clean(suggestionsByField.references?.value) || clean(ideaInput.keywords);
+  const missingInformation = dedupeStrings(
+    [
+      ...(Array.isArray(agentSession.questions)
+        ? agentSession.questions.map((question) => clean(question.reason) || clean(question.question))
+        : []),
+      ...collectMissingInformation(ideaInput)
+    ].filter(Boolean)
+  ).slice(0, 6);
+
+  return {
+    detectedTopic: joinSegments([projectTitle || ideaInput.topic, ideaInput.domain && `Domain: ${ideaInput.domain}`]),
+    problem: problem || ideaInput.problem,
+    motivation: joinSegments([
+      ideaInput.motivation,
+      ideaInput.beneficiaries ? `Primary beneficiaries: ${ideaInput.beneficiaries}` : ''
+    ]),
+    possibleContribution:
+      clean(ideaInput.expectedContribution) || inferContribution({ ...ideaInput, methods: method || ideaInput.methods }),
+    missingInformation,
+    projectTitle,
+    evaluationPlan,
+    timeline,
+    resources,
+    references,
+    latestUpdates: Array.isArray(agentSession.updates) ? agentSession.updates.map(clean).filter(Boolean) : []
+  };
+}
+
+function syncIdeaInputFromAgentField(ideaInput, field, value) {
+  const next = { ...ideaInput };
+  const normalizedField = clean(field).toLowerCase();
+  const normalizedValue = clean(value);
+
+  if (!normalizedValue) {
+    return next;
+  }
+
+  if (normalizedField === 'problem') {
+    next.problem = normalizedValue;
+  } else if (normalizedField === 'method') {
+    next.methods = normalizedValue;
+  } else if (normalizedField === 'resources') {
+    next.datasets = normalizedValue;
+  } else if (normalizedField === 'references') {
+    next.keywords = normalizedValue;
+  } else if (normalizedField === 'title' && !clean(next.topic)) {
+    next.topic = normalizedValue;
+  }
+
+  return next;
+}
+
+function pruneQuestionDrafts(drafts, questions) {
+  const activeIds = new Set((questions || []).map((question) => question.id).filter(Boolean));
+
+  return Object.fromEntries(
+    Object.entries(drafts || {}).filter(([questionId, value]) => activeIds.has(questionId) && Boolean(clean(value)))
+  );
+}
+
+function formatSourceLabel(mode, provider) {
+  const normalizedMode = clean(mode).toLowerCase();
+  const normalizedProvider = clean(provider).toLowerCase();
+
+  if (!normalizedMode && !normalizedProvider) {
+    return 'Waiting';
+  }
+
+  if (normalizedMode === 'api') {
+    if (normalizedProvider === 'gemini') return 'Gemini API';
+    if (normalizedProvider === 'openai-compatible') return 'OpenAI-Compatible API';
+    return 'API';
+  }
+
+  if (normalizedMode === 'simulated-api-output') {
+    return 'Simulated Gemini Output';
+  }
+
+  if (
+    normalizedProvider === 'template' ||
+    normalizedMode === 'template'
+  ) {
+    return 'Legacy Template Run';
+  }
+
+  return titleCase(joinSegments([normalizedProvider, normalizedMode]).replace(/-/g, ' ')) || 'Saved Run';
 }
 
 function validateIdeaInput(ideaInput) {
@@ -2165,12 +2430,12 @@ function buildClientFallbackProposalOutput(ideaInput, proposalBlueprint) {
 }
 
 function normalizeProposalOutputResult(data, ideaInput, proposalBlueprint, fallbackTitle) {
-  const fallbackOutput = buildClientFallbackProposalOutput(ideaInput, proposalBlueprint);
-  const normalizedTitle = clean(fallbackTitle) || fallbackOutput.title || 'Proposal Draft';
-  const proposalLatex = extractProposalOutputLatex(data) || fallbackOutput.proposalLatex;
+  const normalizedTitle =
+    clean(fallbackTitle) || clean(proposalBlueprint?.workingTitle) || clean(ideaInput.topic) || 'Proposal Draft';
+  const proposalLatex = extractProposalOutputLatex(data);
 
   return {
-    mode: data?.mode === 'api' ? 'api' : 'template',
+    mode: clean(data?.mode) || null,
     output: {
       proposalLatex,
       complianceMatrix: Array.isArray(data?.complianceMatrix) ? data.complianceMatrix : [],
@@ -2317,26 +2582,34 @@ function toKebab(value) {
 function hasWorkspaceContent(
   ideaInput,
   ideaPreview,
+  agentSession,
   proposalBlueprint,
+  currentDraftBlueprint,
   relatedWorkPlan,
   critiquePanelResult,
   revisionSuggestions,
   revisionPlan,
+  revisionPreview,
   proposalVersions,
   versionComparison,
-  proposalOutput
+  proposalOutput,
+  stepTranscripts
 ) {
   return (
     Object.values(ideaInput).some((value) => Boolean(clean(value))) ||
     Boolean(ideaPreview) ||
+    Boolean(agentSession) ||
     Boolean(proposalBlueprint) ||
+    Boolean(currentDraftBlueprint) ||
     Boolean(relatedWorkPlan) ||
     Boolean(critiquePanelResult) ||
     Boolean(revisionSuggestions.length) ||
     Boolean(revisionPlan) ||
+    Boolean(revisionPreview) ||
     Boolean(proposalVersions.length) ||
     Boolean(versionComparison) ||
-    Boolean(proposalOutput)
+    Boolean(proposalOutput) ||
+    Object.keys(stepTranscripts || {}).length > 0
   );
 }
 
@@ -2514,15 +2787,10 @@ function getApiBaseCandidates() {
     return [''];
   }
 
-  const hostname = window.location.hostname;
-  const isLocalHost = ['127.0.0.1', 'localhost', '::1'].includes(hostname);
-  const candidates = [''];
-
-  if (import.meta.env.DEV || isLocalHost) {
-    candidates.unshift(`http://${hostname || '127.0.0.1'}:8787`, 'http://127.0.0.1:8787', 'http://localhost:8787');
-  }
-
-  return dedupeStrings(candidates);
+  return getApiBaseCandidatesForEnvironment({
+    hostname: window.location.hostname,
+    isDev: import.meta.env.DEV
+  });
 }
 
 function extractResponseError(text) {

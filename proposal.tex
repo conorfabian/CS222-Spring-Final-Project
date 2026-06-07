@@ -1,0 +1,87 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+
+\title{Predicting NBA Player Injury Risk from Public Data with Interpretable Machine Learning}
+\author{[Student Name] \\ \texttt{[student@university.edu]} \\ [University / Program]}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This proposal studies whether public NBA game logs and public injury reports are enough to support a useful injury-risk model. The main idea is to compare interpretable machine learning baselines such as logistic regression, random forest, and XGBoost against a simple neural baseline. The proposal focuses on a realistic public-data setting because many prior sports analytics studies either use narrower injury targets or rely on deeper models that are harder to explain. The goal is not to claim perfect prediction. The goal is to test whether transparent models can give credible risk signals, clear error analysis, and a reproducible workflow for later research.
+\end{abstract}
+
+\textbf{Keywords:} NBA, injury prediction, interpretable machine learning, XGBoost, public data, sports analytics
+
+\section{Introduction}
+NBA injuries affect player availability, roster planning, and competitive outcomes. Public data sources make it possible to study this problem without team-only systems, but public-data injury modeling is still noisy and easy to overclaim.
+
+Recent NBA injury work already shows two useful reference points. Cohan, Schuster, and Fernandez (2021) used a deep learning approach for NBA injury forecasting with public injury and player data, and they explicitly noted that the data was noisy and incomplete. Lu et al. (2022) focused on lower extremity muscle strains in NBA athletes and reported that XGBoost outperformed logistic regression for that narrower injury setting. Broader review papers also note that the field still lacks standardized preprocessing, open datasets, and consistent evaluation practice. This proposal builds on those observations.
+
+The gap is not ``can any model produce an injury score,'' but whether a transparent public-data pipeline can remain competitive enough to be useful while making its assumptions easier to inspect. The novelty claim is modest: this project does not claim a new deep architecture. It claims a clearer comparison between interpretable baselines and a simple neural baseline in a public-data-only setting, with stronger attention to calibration, error analysis, and readable source notes.
+
+\section{Project Goal}
+The project goal is to build and evaluate a public-data NBA injury-risk pipeline that is simple enough to reproduce and interpretable enough to inspect. The study will compare logistic regression, random forest, and XGBoost against a simple multilayer perceptron baseline. The final result should show whether classic interpretable models are strong enough to remain competitive in this setting and which feature groups matter most.
+
+\section{Methods}
+The technical workflow has four parts. First, the study will collect public injury records from Pro Sports Transactions together with game-log and player-history data from stats.nba.com and Basketball-Reference. Second, it will engineer features such as recent minutes, rolling workload, days of rest, age, position, previous injury counts, and recent availability trends. Third, it will train and compare logistic regression, random forest, XGBoost, and a simple neural baseline. Fourth, it will run a small agent-supported proposal workflow that checks section coverage, flags weak novelty claims, and records revision priorities before the final write-up is locked.
+
+Figure~\ref{fig:workflow} shows the planned workflow. The figure is intentionally simple because the proposal should make the pipeline readable before it becomes more detailed in implementation.
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox{0.92\linewidth}{
+\textbf{Public NBA Injury Study Workflow}\\
+Public injury reports + public game logs + player history\\
+$\rightarrow$ feature engineering (workload, rest, age, injury history, availability)\\
+$\rightarrow$ classic ML branch (logistic regression, random forest, XGBoost)\\
+$\rightarrow$ simple neural baseline branch\\
+$\rightarrow$ evaluation, calibration, and error analysis\\
+$\rightarrow$ proposal agent check for coverage, weak claims, and revision priorities
+}}
+\caption{Planned workflow for the NBA injury-risk study and the supporting proposal-revision loop.}
+\label{fig:workflow}
+\end{figure}
+
+\section{Expected Results and Research Milestones}
+The expected result is not a claim of near-perfect prediction. The expected result is a realistic study that shows what public-data injury modeling can and cannot support. A strong outcome would be an interpretable model that stays close to the neural baseline while producing clearer feature-level explanations and cleaner calibration.
+
+The milestone plan is:
+\begin{itemize}
+\item Weeks 1--2: audit sources, define the injury label, and clean player-level joins.
+\item Weeks 3--4: engineer baseline feature sets and run the first temporal split.
+\item Weeks 5--6: compare models, tune calibration, and complete error analysis.
+\item Weeks 7--8: revise the proposal, finalize source notes, and prepare the final report.
+\end{itemize}
+
+\section{Evaluation Plan}
+The evaluation will use a temporal split so the test data comes from later seasons than the training data. The main metrics will be AUROC, precision, recall, F1, Brier score, and calibration. The study will also report false positives and false negatives because a risk model can look strong on one summary metric while still being hard to use in practice.
+
+There will be four concrete tests. First, each classic model will be compared against logistic regression and the simple neural baseline on the same split. Second, an ablation study will remove recent-workload features to see how much they matter. Third, subgroup checks will compare performance by position and age band. Fourth, calibration plots will test whether the predicted risks are meaningful enough to support later decisions.
+
+The proposal will count the study as successful if an interpretable model matches or stays close to the neural baseline while producing clearer feature importance and stable calibration. A practical target is for XGBoost or random forest to stay within 0.03 AUROC of the neural baseline while keeping better interpretability and no major calibration failure.
+
+\section{Risks and Mitigation}
+The main risk is data quality. Public injury reports can be late, incomplete, or inconsistent. A second risk is class imbalance because serious time-loss injuries are relatively rare. A third risk is that the model may learn roster or playing-time proxies that do not generalize well.
+
+These risks will be handled by using a clearly defined injury label, reporting calibration and error analysis, testing multiple baselines, and marking unsupported claims as assumptions. If the broader injury target is too noisy, the project can narrow the label to a more stable public-data outcome such as a specific time-loss threshold or a narrower injury family.
+
+\section{Resources, Tools, Budget, or Release Plan}
+The project will use public data sources, Python, pandas, scikit-learn, XGBoost, and a lightweight neural baseline in PyTorch or Keras. No special budget is required beyond ordinary local compute for tabular experiments. The release plan is to keep the proposal source, source notes, figure source, and workflow evidence in the course repo so the final PDF can be reproduced later.
+
+\section{References, Assumptions, or Source Notes}
+\begin{itemize}
+\item Cohan, A., Schuster, J., and Fernandez, J. (2021). \textit{A deep learning approach to injury forecasting in NBA basketball}. Used here as the main deep-learning NBA comparison point.
+\item Lu, Y., Pareek, A., Lavoie-Gagne, O. Z., et al. (2022). \textit{Machine Learning for Predicting Lower Extremity Muscle Strain in National Basketball Association Athletes}. Used here as the main interpretable-model NBA comparison point.
+\item Yuan, J., Zeng, Q., Li, J., Cong, Z., and Zhang, Y. (2025). \textit{Machine learning applications in sports injury prediction: A narrative review}. Used here for the broader claim that preprocessing and evaluation are still inconsistent across the field.
+\item Assumption: public injury data is noisy and does not include private biometric signals, so the project should prefer cautious claims over inflated performance claims.
+\item Assumption: the proposal agent helps with scope control and revision, but the research novelty is the public-data NBA injury study itself rather than the writing tool.
+\end{itemize}
+
+\end{document}

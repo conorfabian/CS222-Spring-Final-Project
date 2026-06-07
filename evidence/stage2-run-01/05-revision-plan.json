@@ -1,0 +1,521 @@
+{
+  "request": {
+    "critiquePanelResult": {
+      "overallScore": 8,
+      "reviews": [
+        {
+          "criticName": "Problem & Motivation Critic",
+          "criticRole": "Reviews stakeholder, context, and problem clarity.",
+          "score": 8,
+          "summary": "The problem is concrete and tied to public-data access limits.",
+          "strengths": [
+            "Names clear beneficiaries.",
+            "Explains why private biometric data is a barrier."
+          ],
+          "issues": [
+            {
+              "id": "problem-label",
+              "priority": "Medium",
+              "issue": "The injury label is still too broad.",
+              "whyItMatters": "A broad label can make the study noisy and hard to evaluate.",
+              "suggestedRevision": "Define a reported time-loss injury label and identify a fallback narrower label.",
+              "relatedSection": "Problem Framing",
+              "criticName": "Problem & Motivation Critic"
+            }
+          ],
+          "overallRecommendation": "Keep the public-data access framing and define the injury target carefully."
+        },
+        {
+          "criticName": "Novelty & Related Work Critic",
+          "criticRole": "Reviews prior-work grounding and novelty.",
+          "score": 8,
+          "summary": "The novelty claim is plausible if kept modest and tied to verified NBA comparison points.",
+          "strengths": [
+            "Identifies Cohan and Lu as candidate anchors.",
+            "Avoids claiming a new architecture."
+          ],
+          "issues": [
+            {
+              "id": "novelty-sources",
+              "priority": "High",
+              "issue": "Novelty depends on verifying the strongest prior work.",
+              "whyItMatters": "Reviewers will discount novelty if comparison points are vague.",
+              "suggestedRevision": "Name Cohan et al. and Lu et al. as provisional anchors and mark broader novelty as an assumption until verified.",
+              "relatedSection": "Introduction",
+              "criticName": "Novelty & Related Work Critic"
+            }
+          ],
+          "overallRecommendation": "Use source notes and cautious language for novelty."
+        },
+        {
+          "criticName": "Methods & Feasibility Critic",
+          "criticRole": "Reviews implementation detail and feasibility.",
+          "score": 8,
+          "summary": "The methods are feasible if data joining and temporal split details are specified.",
+          "strengths": [
+            "Names public sources.",
+            "Names interpretable baselines and a neural comparison."
+          ],
+          "issues": [
+            {
+              "id": "temporal-split",
+              "priority": "High",
+              "issue": "The train/test split needs to respect time order.",
+              "whyItMatters": "Random splits can leak future availability information.",
+              "suggestedRevision": "Use a temporal split and report player-level joining assumptions.",
+              "relatedSection": "Methods",
+              "criticName": "Methods & Feasibility Critic"
+            }
+          ],
+          "overallRecommendation": "Lock the split and feature families before modeling."
+        },
+        {
+          "criticName": "Evaluation Plan Critic",
+          "criticRole": "Reviews metrics, baselines, and success criteria.",
+          "score": 9,
+          "summary": "The evaluation plan is strong because it includes discrimination, calibration, errors, and baselines.",
+          "strengths": [
+            "Includes AUROC, F1, Brier score, and calibration.",
+            "Compares classic models against a simple neural baseline."
+          ],
+          "issues": [
+            {
+              "id": "success-threshold",
+              "priority": "Medium",
+              "issue": "The success threshold should be cautious.",
+              "whyItMatters": "A fixed high AUROC target may be unrealistic for noisy public data.",
+              "suggestedRevision": "Use a relative target such as staying within 0.03 AUROC of the neural baseline while improving interpretability.",
+              "relatedSection": "Evaluation Plan",
+              "criticName": "Evaluation Plan Critic"
+            }
+          ],
+          "overallRecommendation": "Prefer relative success criteria and explicit calibration checks."
+        },
+        {
+          "criticName": "Significance / Broader Impacts Critic",
+          "criticRole": "Reviews feasibility, beneficiaries, and responsible claims.",
+          "score": 8,
+          "summary": "The proposal has useful educational and reproducibility value.",
+          "strengths": [
+            "Benefits students and independent researchers.",
+            "Acknowledges public data limitations."
+          ],
+          "issues": [
+            {
+              "id": "assumptions",
+              "priority": "Medium",
+              "issue": "Public injury data limitations should be visible in the final proposal.",
+              "whyItMatters": "Unsupported medical claims would weaken credibility.",
+              "suggestedRevision": "Add assumptions about noisy public reports and missing biometric signals.",
+              "relatedSection": "References, Assumptions, or Source Notes",
+              "criticName": "Significance / Broader Impacts Critic"
+            }
+          ],
+          "overallRecommendation": "Keep the claims cautious and reproducible."
+        }
+      ],
+      "highestPriorityIssues": [
+        {
+          "id": "problem-label",
+          "priority": "Medium",
+          "issue": "The injury label is still too broad.",
+          "whyItMatters": "A broad label can make the study noisy and hard to evaluate.",
+          "suggestedRevision": "Define a reported time-loss injury label and identify a fallback narrower label.",
+          "relatedSection": "Problem Framing",
+          "criticName": "Problem & Motivation Critic"
+        },
+        {
+          "id": "novelty-sources",
+          "priority": "High",
+          "issue": "Novelty depends on verifying the strongest prior work.",
+          "whyItMatters": "Reviewers will discount novelty if comparison points are vague.",
+          "suggestedRevision": "Name Cohan et al. and Lu et al. as provisional anchors and mark broader novelty as an assumption until verified.",
+          "relatedSection": "Introduction",
+          "criticName": "Novelty & Related Work Critic"
+        },
+        {
+          "id": "temporal-split",
+          "priority": "High",
+          "issue": "The train/test split needs to respect time order.",
+          "whyItMatters": "Random splits can leak future availability information.",
+          "suggestedRevision": "Use a temporal split and report player-level joining assumptions.",
+          "relatedSection": "Methods",
+          "criticName": "Methods & Feasibility Critic"
+        },
+        {
+          "id": "success-threshold",
+          "priority": "Medium",
+          "issue": "The success threshold should be cautious.",
+          "whyItMatters": "A fixed high AUROC target may be unrealistic for noisy public data.",
+          "suggestedRevision": "Use a relative target such as staying within 0.03 AUROC of the neural baseline while improving interpretability.",
+          "relatedSection": "Evaluation Plan",
+          "criticName": "Evaluation Plan Critic"
+        },
+        {
+          "id": "assumptions",
+          "priority": "Medium",
+          "issue": "Public injury data limitations should be visible in the final proposal.",
+          "whyItMatters": "Unsupported medical claims would weaken credibility.",
+          "suggestedRevision": "Add assumptions about noisy public reports and missing biometric signals.",
+          "relatedSection": "References, Assumptions, or Source Notes",
+          "criticName": "Significance / Broader Impacts Critic"
+        }
+      ],
+      "suggestedRevisionOrder": [
+        "Ground novelty in verified NBA comparison points.",
+        "Specify a temporal split and injury-label fallback.",
+        "Use concrete metrics and cautious success criteria.",
+        "Record public-data assumptions in source notes."
+      ]
+    }
+  },
+  "response": {
+    "mode": "simulated-api-output",
+    "provider": "codex-simulated-gemini",
+    "revisionSuggestions": [
+      {
+        "id": "problem-label",
+        "sourceCritic": "Problem & Motivation Critic",
+        "priority": "Medium",
+        "relatedSection": "Problem Framing",
+        "issue": "The injury label is still too broad.",
+        "whyItMatters": "A broad label can make the study noisy and hard to evaluate.",
+        "suggestedRevision": "Define a reported time-loss injury label and identify a fallback narrower label.",
+        "status": "deferred",
+        "userNote": "Deferred until the dataset audit confirms injury-label quality."
+      },
+      {
+        "id": "novelty-sources",
+        "sourceCritic": "Novelty & Related Work Critic",
+        "priority": "High",
+        "relatedSection": "Introduction",
+        "issue": "Novelty depends on verifying the strongest prior work.",
+        "whyItMatters": "Reviewers will discount novelty if comparison points are vague.",
+        "suggestedRevision": "Name Cohan et al. and Lu et al. as provisional anchors and mark broader novelty as an assumption until verified.",
+        "status": "accepted",
+        "userNote": ""
+      },
+      {
+        "id": "temporal-split",
+        "sourceCritic": "Methods & Feasibility Critic",
+        "priority": "High",
+        "relatedSection": "Methods",
+        "issue": "The train/test split needs to respect time order.",
+        "whyItMatters": "Random splits can leak future availability information.",
+        "suggestedRevision": "Use a temporal split and report player-level joining assumptions.",
+        "status": "accepted",
+        "userNote": ""
+      },
+      {
+        "id": "success-threshold",
+        "sourceCritic": "Evaluation Plan Critic",
+        "priority": "Medium",
+        "relatedSection": "Evaluation Plan",
+        "issue": "The success threshold should be cautious.",
+        "whyItMatters": "A fixed high AUROC target may be unrealistic for noisy public data.",
+        "suggestedRevision": "Use a relative target such as staying within 0.03 AUROC of the neural baseline while improving interpretability.",
+        "status": "accepted",
+        "userNote": ""
+      },
+      {
+        "id": "assumptions",
+        "sourceCritic": "Significance / Broader Impacts Critic",
+        "priority": "Medium",
+        "relatedSection": "References, Assumptions, or Source Notes",
+        "issue": "Public injury data limitations should be visible in the final proposal.",
+        "whyItMatters": "Unsupported medical claims would weaken credibility.",
+        "suggestedRevision": "Add assumptions about noisy public reports and missing biometric signals.",
+        "status": "accepted",
+        "userNote": ""
+      }
+    ],
+    "revisionPlan": {
+      "acceptedSuggestions": [
+        {
+          "id": "novelty-sources",
+          "sourceCritic": "Novelty & Related Work Critic",
+          "priority": "High",
+          "relatedSection": "Introduction",
+          "issue": "Novelty depends on verifying the strongest prior work.",
+          "whyItMatters": "Reviewers will discount novelty if comparison points are vague.",
+          "suggestedRevision": "Name Cohan et al. and Lu et al. as provisional anchors and mark broader novelty as an assumption until verified.",
+          "status": "accepted",
+          "userNote": ""
+        },
+        {
+          "id": "temporal-split",
+          "sourceCritic": "Methods & Feasibility Critic",
+          "priority": "High",
+          "relatedSection": "Methods",
+          "issue": "The train/test split needs to respect time order.",
+          "whyItMatters": "Random splits can leak future availability information.",
+          "suggestedRevision": "Use a temporal split and report player-level joining assumptions.",
+          "status": "accepted",
+          "userNote": ""
+        },
+        {
+          "id": "success-threshold",
+          "sourceCritic": "Evaluation Plan Critic",
+          "priority": "Medium",
+          "relatedSection": "Evaluation Plan",
+          "issue": "The success threshold should be cautious.",
+          "whyItMatters": "A fixed high AUROC target may be unrealistic for noisy public data.",
+          "suggestedRevision": "Use a relative target such as staying within 0.03 AUROC of the neural baseline while improving interpretability.",
+          "status": "accepted",
+          "userNote": ""
+        },
+        {
+          "id": "assumptions",
+          "sourceCritic": "Significance / Broader Impacts Critic",
+          "priority": "Medium",
+          "relatedSection": "References, Assumptions, or Source Notes",
+          "issue": "Public injury data limitations should be visible in the final proposal.",
+          "whyItMatters": "Unsupported medical claims would weaken credibility.",
+          "suggestedRevision": "Add assumptions about noisy public reports and missing biometric signals.",
+          "status": "accepted",
+          "userNote": ""
+        }
+      ],
+      "rejectedSuggestions": [],
+      "deferredSuggestions": [
+        {
+          "id": "problem-label",
+          "sourceCritic": "Problem & Motivation Critic",
+          "priority": "Medium",
+          "relatedSection": "Problem Framing",
+          "issue": "The injury label is still too broad.",
+          "whyItMatters": "A broad label can make the study noisy and hard to evaluate.",
+          "suggestedRevision": "Define a reported time-loss injury label and identify a fallback narrower label.",
+          "status": "deferred",
+          "userNote": "Deferred until the dataset audit confirms injury-label quality."
+        }
+      ],
+      "revisionOrder": [
+        {
+          "id": "novelty-sources",
+          "sourceCritic": "Novelty & Related Work Critic",
+          "priority": "High",
+          "relatedSection": "Introduction",
+          "issue": "Novelty depends on verifying the strongest prior work.",
+          "whyItMatters": "Reviewers will discount novelty if comparison points are vague.",
+          "suggestedRevision": "Name Cohan et al. and Lu et al. as provisional anchors and mark broader novelty as an assumption until verified.",
+          "status": "accepted",
+          "userNote": ""
+        },
+        {
+          "id": "temporal-split",
+          "sourceCritic": "Methods & Feasibility Critic",
+          "priority": "High",
+          "relatedSection": "Methods",
+          "issue": "The train/test split needs to respect time order.",
+          "whyItMatters": "Random splits can leak future availability information.",
+          "suggestedRevision": "Use a temporal split and report player-level joining assumptions.",
+          "status": "accepted",
+          "userNote": ""
+        },
+        {
+          "id": "success-threshold",
+          "sourceCritic": "Evaluation Plan Critic",
+          "priority": "Medium",
+          "relatedSection": "Evaluation Plan",
+          "issue": "The success threshold should be cautious.",
+          "whyItMatters": "A fixed high AUROC target may be unrealistic for noisy public data.",
+          "suggestedRevision": "Use a relative target such as staying within 0.03 AUROC of the neural baseline while improving interpretability.",
+          "status": "accepted",
+          "userNote": ""
+        },
+        {
+          "id": "assumptions",
+          "sourceCritic": "Significance / Broader Impacts Critic",
+          "priority": "Medium",
+          "relatedSection": "References, Assumptions, or Source Notes",
+          "issue": "Public injury data limitations should be visible in the final proposal.",
+          "whyItMatters": "Unsupported medical claims would weaken credibility.",
+          "suggestedRevision": "Add assumptions about noisy public reports and missing biometric signals.",
+          "status": "accepted",
+          "userNote": ""
+        }
+      ],
+      "summary": "The revision plan accepts 4 high-value suggestions focused on Introduction, Methods, Evaluation Plan, and References, Assumptions, or Source Notes.",
+      "sectionsToRevise": [
+        "Introduction",
+        "Methods",
+        "Evaluation Plan",
+        "References, Assumptions, or Source Notes"
+      ]
+    },
+    "transcript": {
+      "prompt": {
+        "critiquePanelResult": {
+          "overallScore": 8,
+          "reviews": [
+            {
+              "criticName": "Problem & Motivation Critic",
+              "criticRole": "Reviews stakeholder, context, and problem clarity.",
+              "score": 8,
+              "summary": "The problem is concrete and tied to public-data access limits.",
+              "strengths": [
+                "Names clear beneficiaries.",
+                "Explains why private biometric data is a barrier."
+              ],
+              "issues": [
+                {
+                  "id": "problem-label",
+                  "priority": "Medium",
+                  "issue": "The injury label is still too broad.",
+                  "whyItMatters": "A broad label can make the study noisy and hard to evaluate.",
+                  "suggestedRevision": "Define a reported time-loss injury label and identify a fallback narrower label.",
+                  "relatedSection": "Problem Framing",
+                  "criticName": "Problem & Motivation Critic"
+                }
+              ],
+              "overallRecommendation": "Keep the public-data access framing and define the injury target carefully."
+            },
+            {
+              "criticName": "Novelty & Related Work Critic",
+              "criticRole": "Reviews prior-work grounding and novelty.",
+              "score": 8,
+              "summary": "The novelty claim is plausible if kept modest and tied to verified NBA comparison points.",
+              "strengths": [
+                "Identifies Cohan and Lu as candidate anchors.",
+                "Avoids claiming a new architecture."
+              ],
+              "issues": [
+                {
+                  "id": "novelty-sources",
+                  "priority": "High",
+                  "issue": "Novelty depends on verifying the strongest prior work.",
+                  "whyItMatters": "Reviewers will discount novelty if comparison points are vague.",
+                  "suggestedRevision": "Name Cohan et al. and Lu et al. as provisional anchors and mark broader novelty as an assumption until verified.",
+                  "relatedSection": "Introduction",
+                  "criticName": "Novelty & Related Work Critic"
+                }
+              ],
+              "overallRecommendation": "Use source notes and cautious language for novelty."
+            },
+            {
+              "criticName": "Methods & Feasibility Critic",
+              "criticRole": "Reviews implementation detail and feasibility.",
+              "score": 8,
+              "summary": "The methods are feasible if data joining and temporal split details are specified.",
+              "strengths": [
+                "Names public sources.",
+                "Names interpretable baselines and a neural comparison."
+              ],
+              "issues": [
+                {
+                  "id": "temporal-split",
+                  "priority": "High",
+                  "issue": "The train/test split needs to respect time order.",
+                  "whyItMatters": "Random splits can leak future availability information.",
+                  "suggestedRevision": "Use a temporal split and report player-level joining assumptions.",
+                  "relatedSection": "Methods",
+                  "criticName": "Methods & Feasibility Critic"
+                }
+              ],
+              "overallRecommendation": "Lock the split and feature families before modeling."
+            },
+            {
+              "criticName": "Evaluation Plan Critic",
+              "criticRole": "Reviews metrics, baselines, and success criteria.",
+              "score": 9,
+              "summary": "The evaluation plan is strong because it includes discrimination, calibration, errors, and baselines.",
+              "strengths": [
+                "Includes AUROC, F1, Brier score, and calibration.",
+                "Compares classic models against a simple neural baseline."
+              ],
+              "issues": [
+                {
+                  "id": "success-threshold",
+                  "priority": "Medium",
+                  "issue": "The success threshold should be cautious.",
+                  "whyItMatters": "A fixed high AUROC target may be unrealistic for noisy public data.",
+                  "suggestedRevision": "Use a relative target such as staying within 0.03 AUROC of the neural baseline while improving interpretability.",
+                  "relatedSection": "Evaluation Plan",
+                  "criticName": "Evaluation Plan Critic"
+                }
+              ],
+              "overallRecommendation": "Prefer relative success criteria and explicit calibration checks."
+            },
+            {
+              "criticName": "Significance / Broader Impacts Critic",
+              "criticRole": "Reviews feasibility, beneficiaries, and responsible claims.",
+              "score": 8,
+              "summary": "The proposal has useful educational and reproducibility value.",
+              "strengths": [
+                "Benefits students and independent researchers.",
+                "Acknowledges public data limitations."
+              ],
+              "issues": [
+                {
+                  "id": "assumptions",
+                  "priority": "Medium",
+                  "issue": "Public injury data limitations should be visible in the final proposal.",
+                  "whyItMatters": "Unsupported medical claims would weaken credibility.",
+                  "suggestedRevision": "Add assumptions about noisy public reports and missing biometric signals.",
+                  "relatedSection": "References, Assumptions, or Source Notes",
+                  "criticName": "Significance / Broader Impacts Critic"
+                }
+              ],
+              "overallRecommendation": "Keep the claims cautious and reproducible."
+            }
+          ],
+          "highestPriorityIssues": [
+            {
+              "id": "problem-label",
+              "priority": "Medium",
+              "issue": "The injury label is still too broad.",
+              "whyItMatters": "A broad label can make the study noisy and hard to evaluate.",
+              "suggestedRevision": "Define a reported time-loss injury label and identify a fallback narrower label.",
+              "relatedSection": "Problem Framing",
+              "criticName": "Problem & Motivation Critic"
+            },
+            {
+              "id": "novelty-sources",
+              "priority": "High",
+              "issue": "Novelty depends on verifying the strongest prior work.",
+              "whyItMatters": "Reviewers will discount novelty if comparison points are vague.",
+              "suggestedRevision": "Name Cohan et al. and Lu et al. as provisional anchors and mark broader novelty as an assumption until verified.",
+              "relatedSection": "Introduction",
+              "criticName": "Novelty & Related Work Critic"
+            },
+            {
+              "id": "temporal-split",
+              "priority": "High",
+              "issue": "The train/test split needs to respect time order.",
+              "whyItMatters": "Random splits can leak future availability information.",
+              "suggestedRevision": "Use a temporal split and report player-level joining assumptions.",
+              "relatedSection": "Methods",
+              "criticName": "Methods & Feasibility Critic"
+            },
+            {
+              "id": "success-threshold",
+              "priority": "Medium",
+              "issue": "The success threshold should be cautious.",
+              "whyItMatters": "A fixed high AUROC target may be unrealistic for noisy public data.",
+              "suggestedRevision": "Use a relative target such as staying within 0.03 AUROC of the neural baseline while improving interpretability.",
+              "relatedSection": "Evaluation Plan",
+              "criticName": "Evaluation Plan Critic"
+            },
+            {
+              "id": "assumptions",
+              "priority": "Medium",
+              "issue": "Public injury data limitations should be visible in the final proposal.",
+              "whyItMatters": "Unsupported medical claims would weaken credibility.",
+              "suggestedRevision": "Add assumptions about noisy public reports and missing biometric signals.",
+              "relatedSection": "References, Assumptions, or Source Notes",
+              "criticName": "Significance / Broader Impacts Critic"
+            }
+          ],
+          "suggestedRevisionOrder": [
+            "Ground novelty in verified NBA comparison points.",
+            "Specify a temporal split and injury-label fallback.",
+            "Use concrete metrics and cautious success criteria.",
+            "Record public-data assumptions in source notes."
+          ]
+        }
+      },
+      "rawResponse": "Simulated Step 5 sorted critique issues into accepted and deferred revision decisions."
+    }
+  }
+}

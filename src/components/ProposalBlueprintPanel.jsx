@@ -5,17 +5,15 @@ function ProposalBlueprintPanel({
   blueprint,
   blueprintError,
   blueprintGeneratedAt,
-  blueprintMode,
   blueprintStatus,
   blueprintStale,
   onGenerate,
   onGenerateRelatedWork,
   relatedWorkPlanExists,
   relatedWorkStale,
-  relatedWorkStatus
+  relatedWorkStatus,
+  sourceLabel
 }) {
-  const modeLabel = blueprintMode === 'api' ? 'Gemini' : blueprintMode === 'template' ? 'Template' : 'Waiting';
-
   const framingItems = blueprint
     ? [
         { label: 'Working Title', value: blueprint.workingTitle },
@@ -55,7 +53,7 @@ function ProposalBlueprintPanel({
           <h2>Proposal Blueprint</h2>
           <p>This blueprint organizes the rough idea into the core parts of a graduate-style research proposal scaffold.</p>
         </div>
-        <span className={blueprintMode ? 'mode-pill is-ready' : 'mode-pill'}>{modeLabel}</span>
+        <span className={sourceLabel !== 'Waiting' ? 'mode-pill is-ready' : 'mode-pill'}>{sourceLabel}</span>
       </div>
 
       <div className="action-row summary-actions">

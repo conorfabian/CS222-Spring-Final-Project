@@ -1,0 +1,152 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 3 /Kids [7 0 R 9 0 R 11 0 R] >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+6 0 obj
+<< /Length 4142 >>
+stream
+BT /F2 17 Tf 1 0 0 1 86.19 720 Tm (Predicting NBA Player Injury Risk from Public Data) Tj ET
+BT /F2 17 Tf 1 0 0 1 147.90 700 Tm (with Interpretable Machine Learning) Tj ET
+BT /F1 11 Tf 1 0 0 1 267.17 672 Tm ([Student Name]) Tj ET
+BT /F1 11 Tf 1 0 0 1 243.41 659 Tm ([student@university.edu]) Tj ET
+BT /F1 11 Tf 1 0 0 1 250.12 646 Tm ([University / Program]) Tj ET
+BT /F2 12 Tf 1 0 0 1 72 607 Tm (Introduction) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 587 Tm (NBA injuries affect player availability, roster planning, and competitive outcomes. Public) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 573 Tm (data sources make it possible to study this problem without team-only systems, but) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 559 Tm (public-data injury modeling is still noisy and easy to overclaim.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 539 Tm (Recent NBA injury work already shows two useful reference points. Cohan, Schuster, and) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 525 Tm (Fernandez \(2021\) used a deep learning approach for NBA injury forecasting with public) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 511 Tm (injury and player data, and they explicitly noted that the data was noisy and incomplete. Lu) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 497 Tm (et al. \(2022\) focused on lower extremity muscle strains in NBA athletes and reported that) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 483 Tm (XGBoost outperformed logistic regression for that narrower injury setting. Broader) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 469 Tm (review papers also note that the field still lacks standardized preprocessing, open datasets,) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 455 Tm (and consistent evaluation practice. This proposal builds on those observations.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 435 Tm (The gap is not ``can any model produce an injury score,'' but whether a transparent) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 421 Tm (public-data pipeline can remain competitive enough to be useful while making its assumptions) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 407 Tm (easier to inspect. The novelty claim is modest: this project does not claim a new deep) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 393 Tm (architecture. It claims a clearer comparison between interpretable baselines and a simple) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 379 Tm (neural baseline in a public-data-only setting, with stronger attention to calibration, error) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 365 Tm (analysis, and readable source notes.) Tj ET
+BT /F2 12 Tf 1 0 0 1 72 331 Tm (Project Goal) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 311 Tm (The project goal is to build and evaluate a public-data NBA injury-risk pipeline that is simple) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 297 Tm (enough to reproduce and interpretable enough to inspect. The study will compare logistic) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 283 Tm (regression, random forest, and XGBoost against a simple multilayer perceptron baseline. The) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 269 Tm (final result should show whether classic interpretable models are strong enough to remain) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 255 Tm (competitive in this setting and which feature groups matter most.) Tj ET
+BT /F2 12 Tf 1 0 0 1 72 221 Tm (Methods) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 201 Tm (The technical workflow has four parts. First, the study will collect public injury records) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 187 Tm (from Pro Sports Transactions together with game-log and player-history data from) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 173 Tm (stats.nba.com and Basketball-Reference. Second, it will engineer features such as recent) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 159 Tm (minutes, rolling workload, days of rest, age, position, previous injury counts, and recent) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 145 Tm (availability trends. Third, it will train and compare logistic regression, random forest,) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 131 Tm (XGBoost, and a simple neural baseline. Fourth, it will run a small agent-supported proposal) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 117 Tm (workflow that checks section coverage, flags weak novelty claims, and records revision) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 103 Tm (priorities before the final write-up is locked.) Tj ET
+BT /F1 10 Tf 1 0 0 1 280.45 38 Tm (Page 1 of 3) Tj ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 4126 >>
+stream
+BT /F1 11 Tf 1 0 0 1 72 720 Tm (Figure~ shows the planned workflow. The figure is intentionally simple because the proposal) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 706 Tm (should make the pipeline readable before it becomes more detailed in implementation.) Tj ET
+BT /F2 12 Tf 1 0 0 1 72 672 Tm (Expected Results and Research Milestones) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 652 Tm (The expected result is not a claim of near-perfect prediction. The expected result is a) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 638 Tm (realistic study that shows what public-data injury modeling can and cannot support. A) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 624 Tm (strong outcome would be an interpretable model that stays close to the neural baseline) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 610 Tm (while producing clearer feature-level explanations and cleaner calibration.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 590 Tm (The milestone plan is:) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 570 Tm (- Weeks 1--2: audit sources, define the injury label, and clean player-level joins.) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 552 Tm (- Weeks 3--4: engineer baseline feature sets and run the first temporal split.) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 534 Tm (- Weeks 5--6: compare models, tune calibration, and complete error analysis.) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 516 Tm (- Weeks 7--8: revise the proposal, finalize source notes, and prepare the final report.) Tj ET
+BT /F2 12 Tf 1 0 0 1 72 480 Tm (Evaluation Plan) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 460 Tm (The evaluation will use a temporal split so the test data comes from later seasons than the) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 446 Tm (training data. The main metrics will be AUROC, precision, recall, F1, Brier score, and) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 432 Tm (calibration. The study will also report false positives and false negatives because a risk) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 418 Tm (model can look strong on one summary metric while still being hard to use in practice.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 398 Tm (There will be four concrete tests. First, each classic model will be compared against logistic) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 384 Tm (regression and the simple neural baseline on the same split. Second, an ablation study will) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 370 Tm (remove recent-workload features to see how much they matter. Third, subgroup checks will) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 356 Tm (compare performance by position and age band. Fourth, calibration plots will test whether) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 342 Tm (the predicted risks are meaningful enough to support later decisions.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 322 Tm (The proposal will count the study as successful if an interpretable model matches or stays) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 308 Tm (close to the neural baseline while producing clearer feature importance and stable) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 294 Tm (calibration. A practical target is for XGBoost or random forest to stay within 0.03 AUROC) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 280 Tm (of the neural baseline while keeping better interpretability and no major calibration failure.) Tj ET
+BT /F2 12 Tf 1 0 0 1 72 246 Tm (Risks and Mitigation) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 226 Tm (The main risk is data quality. Public injury reports can be late, incomplete, or inconsistent. A) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 212 Tm (second risk is class imbalance because serious time-loss injuries are relatively rare. A third) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 198 Tm (risk is that the model may learn roster or playing-time proxies that do not generalize well.) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 178 Tm (These risks will be handled by using a clearly defined injury label, reporting calibration and) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 164 Tm (error analysis, testing multiple baselines, and marking unsupported claims as assumptions. If) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 150 Tm (the broader injury target is too noisy, the project can narrow the label to a more stable) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 136 Tm (public-data outcome such as a specific time-loss threshold or a narrower injury family.) Tj ET
+BT /F1 10 Tf 1 0 0 1 280.45 38 Tm (Page 2 of 3) Tj ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 2258 >>
+stream
+BT /F2 12 Tf 1 0 0 1 72 710 Tm (Resources, Tools, Budget, or Release Plan) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 690 Tm (The project will use public data sources, Python, pandas, scikit-learn, XGBoost, and a) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 676 Tm (lightweight neural baseline in PyTorch or Keras. No special budget is required beyond) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 662 Tm (ordinary local compute for tabular experiments. The release plan is to keep the proposal) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 648 Tm (source, source notes, figure source, and workflow evidence in the course repo so the final) Tj ET
+BT /F1 11 Tf 1 0 0 1 72 634 Tm (PDF can be reproduced later.) Tj ET
+BT /F2 12 Tf 1 0 0 1 72 600 Tm (References, Assumptions, or Source Notes) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 580 Tm (- Cohan, A., Schuster, J., and Fernandez, J. \(2021\). A deep learning approach to injury) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 566 Tm (forecasting in NBA basketball. Used here as the main deep-learning NBA comparison point.) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 548 Tm (- Lu, Y., Pareek, A., Lavoie-Gagne, O. Z., et al. \(2022\). Machine Learning for Predicting Lower) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 534 Tm (Extremity Muscle Strain in National Basketball Association Athletes. Used here as the) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 520 Tm (main interpretable-model NBA comparison point.) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 502 Tm (- Yuan, J., Zeng, Q., Li, J., Cong, Z., and Zhang, Y. \(2025\). Machine learning applications in) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 488 Tm (sports injury prediction: A narrative review. Used here for the broader claim that) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 474 Tm (preprocessing and evaluation are still inconsistent across the field.) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 456 Tm (- Assumption: public injury data is noisy and does not include private biometric signals, so) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 442 Tm (the project should prefer cautious claims over inflated performance claims.) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 424 Tm (- Assumption: the proposal agent helps with scope control and revision, but the research) Tj ET
+BT /F1 11 Tf 1 0 0 1 86 410 Tm (novelty is the public-data NBA injury study itself rather than the writing tool.) Tj ET
+BT /F1 10 Tf 1 0 0 1 280.45 38 Tm (Page 3 of 3) Tj ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 10 0 R >>
+endobj
+xref
+0 12
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000128 00000 n 
+0000000200 00000 n 
+0000000271 00000 n 
+0000000339 00000 n 
+0000004533 00000 n 
+0000004679 00000 n 
+0000008857 00000 n 
+0000009003 00000 n 
+0000011314 00000 n 
+trailer
+<< /Size 12 /Root 1 0 R >>
+startxref
+11462
+%%EOF

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
+import { buildCorsOriginValidator } from './corsOrigin.js';
 import { proposalLatexToPdf } from './pdfExport.js';
 import {
   answerAgentQuestion,
@@ -15,13 +16,24 @@ import {
 const app = express();
 const port = Number(process.env.PORT || 8787);
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
+app.use(cors({ origin: buildCorsOriginValidator(process.env.CORS_ORIGIN) }));
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (_request, response) => {
+  const missingConfig = [
+    ['LLM_API_KEY', process.env.LLM_API_KEY],
+    ['LLM_API_URL', process.env.LLM_API_URL],
+    ['LLM_MODEL', process.env.LLM_MODEL]
+  ]
+    .filter(([, value]) => !String(value || '').trim())
+    .map(([key]) => key);
+
   response.json({
-    ok: true,
-    mode: process.env.LLM_API_KEY ? 'api-ready' : 'local-fallback'
+    ok: missingConfig.length === 0,
+    mode: missingConfig.length === 0 ? 'api-ready' : 'api-not-configured',
+    provider: process.env.LLM_PROVIDER || null,
+    model: process.env.LLM_MODEL || null,
+    missingConfig
   });
 });
 

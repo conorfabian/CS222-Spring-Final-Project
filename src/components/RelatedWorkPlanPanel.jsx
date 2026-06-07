@@ -9,13 +9,11 @@ function RelatedWorkPlanPanel({
   onRunCritique,
   relatedWorkError,
   relatedWorkGeneratedAt,
-  relatedWorkMode,
   relatedWorkPlan,
   relatedWorkStale,
-  relatedWorkStatus
+  relatedWorkStatus,
+  sourceLabel
 }) {
-  const modeLabel = relatedWorkMode === 'api' ? 'Gemini' : relatedWorkMode === 'template' ? 'Template' : 'Waiting';
-
   return (
     <section className="related-work-panel panel-card">
       <div className="panel-header-row">
@@ -27,7 +25,7 @@ function RelatedWorkPlanPanel({
             they are search plans for finding real sources.
           </p>
         </div>
-        <span className={relatedWorkMode ? 'mode-pill is-ready' : 'mode-pill'}>{modeLabel}</span>
+        <span className={sourceLabel !== 'Waiting' ? 'mode-pill is-ready' : 'mode-pill'}>{sourceLabel}</span>
       </div>
 
       <div className="action-row summary-actions">
@@ -43,10 +41,6 @@ function RelatedWorkPlanPanel({
         >
           {critiqueStatus === 'generating' ? <Loader2 className="spin" size={16} aria-hidden="true" /> : <ArrowRight size={16} aria-hidden="true" />}
           {critiquePanelExists ? 'Run Critique Again' : 'Run Multi-Agent Critique'}
-        </button>
-        <button className="ghost" disabled={!critiquePanelExists || critiqueStale} type="button">
-          <ArrowRight size={16} aria-hidden="true" />
-          Next: Accept or Reject Suggestions
         </button>
       </div>
 

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#f8fafc"/>
+  <rect x="40" y="40" width="1200" height="640" rx="18" fill="#ffffff" stroke="#d1d5db" stroke-width="2"/>
+  <text x="60" y="92" font-size="34" font-weight="700" fill="#0f172a">Step 1: Intake And Clarifying Question</text>
+  <text x="60" y="130" font-size="22" fill="#111827">Input topic: NBA player injury risk from public data</text>
+<text x="60" y="174" font-size="22" fill="#111827">Captured problem, motivation, beneficiaries, methods, datasets, and uncertainties</text>
+<text x="60" y="218" font-size="22" fill="#111827">Agent question: which metrics and baselines define success?</text>
+<text x="60" y="262" font-size="22" fill="#111827">Human answer: AUROC, precision, recall, F1, Brier score, calibration, neural baseline</text>
+  <rect x="60" y="600" width="520" height="42" rx="8" fill="#e0f2fe"/>
+  <text x="78" y="628" font-size="18" fill="#075985">Simulated API output due to Gemini quota; instructor-approved proof package.</text>
+</svg>

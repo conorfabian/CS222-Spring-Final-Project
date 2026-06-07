@@ -7,8 +7,10 @@ function CompletedIdeaSummary({
   ideaInput,
   ideaPreview,
   lastAnalyzedAt,
+  openQuestionCount,
   onEdit,
-  onGenerateBlueprint
+  onGenerateBlueprint,
+  sourceLabel
 }) {
   return (
     <section className="summary-panel panel-card">
@@ -23,7 +25,7 @@ function CompletedIdeaSummary({
         </div>
         <span className="mode-pill is-ready">
           <CheckCircle2 size={14} aria-hidden="true" />
-          Step 1 ready
+          {sourceLabel}
         </span>
       </div>
 
@@ -60,7 +62,9 @@ function CompletedIdeaSummary({
           <p>
             {ideaPreview?.missingInformation?.length
               ? `${ideaPreview.missingInformation.length} open detail${ideaPreview.missingInformation.length > 1 ? 's' : ''} remain for later stages.`
-              : 'No major missing information detected by the Step 1 template.'}
+              : openQuestionCount
+                ? `${openQuestionCount} clarifying question${openQuestionCount > 1 ? 's' : ''} still remain in the Step 1 agent session.`
+                : 'No major missing information remains in the current Step 1 agent session.'}
           </p>
         </article>
       </div>

@@ -1,0 +1,33 @@
+{
+  "startedAt": "2026-06-06T23:30:00.000Z",
+  "endedAt": "2026-06-06T23:37:00.000Z",
+  "topic": "Predicting NBA player injury risk from publicly available data with interpretable machine learning",
+  "simulationReason": "Gemini API free-tier quota prevented a fresh live run; instructor allowed simulated AI-agent output for the pipeline proof package.",
+  "modes": {
+    "step1Start": "simulated-api-output",
+    "step1Answer": "simulated-api-output",
+    "blueprint": "simulated-api-output",
+    "relatedWork": "simulated-api-output",
+    "critique": "simulated-api-output",
+    "revisionPlan": "simulated-api-output",
+    "revisions": "simulated-api-output",
+    "proposal": "simulated-api-output"
+  },
+  "providers": {
+    "step1Start": "codex-simulated-gemini",
+    "step1Answer": "codex-simulated-gemini",
+    "blueprint": "codex-simulated-gemini",
+    "relatedWork": "codex-simulated-gemini",
+    "critique": "codex-simulated-gemini",
+    "revisionPlan": "codex-simulated-gemini",
+    "revisions": "codex-simulated-gemini",
+    "proposal": "codex-simulated-gemini"
+  },
+  "outputs": {
+    "proposalPdf": "proposal.pdf",
+    "proposalTex": "proposal.tex",
+    "snapshot": "public/latest-run-snapshot.json",
+    "pageCount": 3,
+    "validationStatus": "passed"
+  }
+}

@@ -1,0 +1,11 @@
+flowchart LR
+  A["Public NBA injury reports"] --> D["Feature engineering"]
+  B["Public game logs"] --> D
+  C["Player history"] --> D
+  D --> E["Classic ML baselines<br/>logistic regression<br/>random forest<br/>XGBoost"]
+  D --> F["Simple neural baseline"]
+  E --> G["Evaluation<br/>AUROC, precision, recall,<br/>F1, Brier, calibration"]
+  F --> G
+  G --> H["Error analysis and subgroup checks"]
+  H --> I["Proposal agent check<br/>coverage, weak claims,<br/>revision priorities"]
+  I --> J["Revised proposal and final study plan"]

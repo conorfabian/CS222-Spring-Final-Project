@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <rect width="1200" height="700" fill="#f8fafc"/>
+  <text x="60" y="60" font-size="34" font-weight="700" fill="#0f172a">NBA Injury Study Workflow</text>
+
+  <rect x="60" y="110" width="220" height="90" rx="14" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="170" y="150" text-anchor="middle" font-size="22" fill="#0f172a">Public injury reports</text>
+
+  <rect x="60" y="235" width="220" height="90" rx="14" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="170" y="275" text-anchor="middle" font-size="22" fill="#0f172a">Public game logs</text>
+
+  <rect x="60" y="360" width="220" height="90" rx="14" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+  <text x="170" y="400" text-anchor="middle" font-size="22" fill="#0f172a">Player history</text>
+
+  <rect x="370" y="210" width="250" height="140" rx="14" fill="#dcfce7" stroke="#15803d" stroke-width="2"/>
+  <text x="495" y="255" text-anchor="middle" font-size="24" fill="#0f172a">Feature engineering</text>
+  <text x="495" y="290" text-anchor="middle" font-size="19" fill="#0f172a">workload</text>
+  <text x="495" y="318" text-anchor="middle" font-size="19" fill="#0f172a">rest days</text>
+  <text x="495" y="346" text-anchor="middle" font-size="19" fill="#0f172a">injury history</text>
+
+  <rect x="700" y="120" width="220" height="130" rx="14" fill="#fde68a" stroke="#b45309" stroke-width="2"/>
+  <text x="810" y="160" text-anchor="middle" font-size="22" fill="#0f172a">Classic ML baselines</text>
+  <text x="810" y="192" text-anchor="middle" font-size="18" fill="#0f172a">logistic regression</text>
+  <text x="810" y="218" text-anchor="middle" font-size="18" fill="#0f172a">random forest</text>
+  <text x="810" y="244" text-anchor="middle" font-size="18" fill="#0f172a">XGBoost</text>
+
+  <rect x="700" y="310" width="220" height="90" rx="14" fill="#fde68a" stroke="#b45309" stroke-width="2"/>
+  <text x="810" y="352" text-anchor="middle" font-size="22" fill="#0f172a">Simple neural baseline</text>
+
+  <rect x="970" y="180" width="180" height="140" rx="14" fill="#fecaca" stroke="#b91c1c" stroke-width="2"/>
+  <text x="1060" y="220" text-anchor="middle" font-size="22" fill="#0f172a">Evaluation</text>
+  <text x="1060" y="252" text-anchor="middle" font-size="18" fill="#0f172a">AUROC, recall, F1</text>
+  <text x="1060" y="278" text-anchor="middle" font-size="18" fill="#0f172a">Brier, calibration</text>
+  <text x="1060" y="304" text-anchor="middle" font-size="18" fill="#0f172a">error analysis</text>
+
+  <rect x="770" y="500" width="290" height="110" rx="14" fill="#e9d5ff" stroke="#7e22ce" stroke-width="2"/>
+  <text x="915" y="540" text-anchor="middle" font-size="22" fill="#0f172a">Proposal agent check</text>
+  <text x="915" y="572" text-anchor="middle" font-size="18" fill="#0f172a">coverage, weak claims,</text>
+  <text x="915" y="598" text-anchor="middle" font-size="18" fill="#0f172a">revision priorities</text>
+
+  <line x1="280" y1="155" x2="370" y2="250" stroke="#475569" stroke-width="4"/>
+  <line x1="280" y1="280" x2="370" y2="280" stroke="#475569" stroke-width="4"/>
+  <line x1="280" y1="405" x2="370" y2="310" stroke="#475569" stroke-width="4"/>
+  <line x1="620" y1="250" x2="700" y2="185" stroke="#475569" stroke-width="4"/>
+  <line x1="620" y1="300" x2="700" y2="355" stroke="#475569" stroke-width="4"/>
+  <line x1="920" y1="185" x2="970" y2="215" stroke="#475569" stroke-width="4"/>
+  <line x1="920" y1="355" x2="970" y2="285" stroke="#475569" stroke-width="4"/>
+  <line x1="1060" y1="320" x2="915" y2="500" stroke="#475569" stroke-width="4"/>
+
+  <polygon points="365,244 383,248 372,262" fill="#475569"/>
+  <polygon points="365,275 383,280 365,285" fill="#475569"/>
+  <polygon points="365,298 380,286 383,304" fill="#475569"/>
+  <polygon points="694,181 710,182 699,197" fill="#475569"/>
+  <polygon points="694,360 700,344 712,356" fill="#475569"/>
+  <polygon points="964,213 978,212 969,224" fill="#475569"/>
+  <polygon points="968,279 979,290 964,291" fill="#475569"/>
+  <polygon points="917,495 909,511 925,509" fill="#475569"/>
+</svg>

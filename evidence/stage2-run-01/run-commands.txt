@@ -1,0 +1,4 @@
+node scripts/generate-simulated-submission.mjs
+npm test
+npm run build
+node --input-type=module -e "validate proposal.tex and proposal.pdf page count"

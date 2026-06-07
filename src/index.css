@@ -642,6 +642,116 @@ p {
   font-size: 0.92rem;
 }
 
+.readiness-card small {
+  color: #536475;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.agent-guidance-stack,
+.decision-stack,
+.question-stack {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.agent-guidance-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(76, 135, 214, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(255, 253, 248, 0.84), rgba(255, 255, 255, 0.95));
+}
+
+.agent-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.agent-choice-card,
+.decision-option-button,
+.compliance-matrix-row {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.agent-choice-header,
+.compliance-row-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.agent-choice-header > div {
+  display: grid;
+  gap: 6px;
+}
+
+.confidence-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 26px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(18, 61, 99, 0.08);
+  color: #204465;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.compact-heading h4 {
+  margin: 0;
+  color: #173f66;
+}
+
+.decision-option-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.decision-option-button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
+.decision-option-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(17, 63, 103, 0.16);
+  box-shadow: 0 14px 30px rgba(20, 63, 103, 0.08);
+}
+
+.decision-option-button span,
+.agent-choice-card p,
+.agent-choice-card small {
+  color: #203244;
+  line-height: 1.55;
+}
+
+.agent-answer-input {
+  min-height: 96px;
+}
+
+.agent-answer-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .preview-column {
   display: grid;
   gap: 18px;
@@ -774,6 +884,45 @@ p {
 
 .seed-list dd {
   margin: 0;
+}
+
+.preview-seed-list {
+  margin-top: 0;
+}
+
+.transcript-details {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background: rgba(248, 244, 235, 0.72);
+}
+
+.transcript-details summary {
+  cursor: pointer;
+  color: #173f66;
+  font-weight: 800;
+}
+
+.transcript-block-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.transcript-block-grid pre,
+.evidence-report-view {
+  margin: 0;
+  padding: 14px;
+  overflow-x: auto;
+  border-radius: 18px;
+  border: 1px solid rgba(17, 32, 50, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  font-family: "IBM Plex Mono", "SFMono-Regular", "Menlo", monospace;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
 }
 
 .future-card-grid {
@@ -1141,6 +1290,11 @@ p {
 .priority-badge.is-low {
   background: rgba(18, 61, 99, 0.1);
   color: #1c4b77;
+}
+
+.priority-badge.is-covered {
+  background: rgba(228, 245, 240, 0.92);
+  color: #245546;
 }
 
 .issue-section-chip,
@@ -1564,6 +1718,17 @@ p {
   margin-top: 18px;
 }
 
+.proposal-evidence-grid,
+.compliance-matrix-list {
+  display: grid;
+  gap: 16px;
+}
+
+.proposal-evidence-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
 .proposal-output-view {
   display: grid;
   gap: 16px;
@@ -1674,6 +1839,7 @@ p {
 
 @media (max-width: 1280px) {
   .blueprint-card-grid,
+  .agent-card-grid,
   .related-work-top-grid,
   .related-work-bottom-grid,
   .related-bucket-grid,
@@ -1682,7 +1848,9 @@ p {
   .revision-planning-layout,
   .apply-revisions-summary-grid,
   .apply-revisions-layout,
-  .comparison-columns {
+  .comparison-columns,
+  .proposal-evidence-grid,
+  .transcript-block-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -1716,11 +1884,14 @@ p {
   .field-grid,
   .future-card-grid,
   .summary-card-grid,
+  .agent-card-grid,
   .related-work-top-grid,
   .related-work-bottom-grid,
   .related-bucket-grid,
   .critique-summary-grid,
-  .critic-review-grid {
+  .critic-review-grid,
+  .proposal-evidence-grid,
+  .transcript-block-grid {
     display: block;
   }
 
@@ -1762,6 +1933,9 @@ p {
   .future-card,
   .preview-card,
   .summary-card,
+  .agent-guidance-card,
+  .agent-choice-card,
+  .decision-option-button,
   .blueprint-section-card,
   .related-card,
   .related-bucket-card,

@@ -8,6 +8,9 @@
     "dev:api": "node --watch server/index.js",
     "dev:web": "vite --host 127.0.0.1 --port 5174",
     "build": "vite build",
+    "test": "node --test",
+    "capture:stage2:evidence": "node scripts/capture-stage2-evidence.mjs",
+    "generate:simulated-submission": "node scripts/generate-simulated-submission.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4174",
     "start": "node server/index.js"
   },

@@ -43,20 +43,24 @@ function CriticReviewCard({ review }) {
             <span>Prioritized Issues</span>
           </div>
           <div className="critique-issue-list">
-            {review.issues.map((issue) => (
-              <article className="critique-issue-card" key={issue.id}>
-                <div className="critique-issue-topline">
-                  <span className={`priority-badge ${priorityTone(issue.priority)}`}>{issue.priority}</span>
-                  {issue.relatedSection ? <span className="issue-section-chip">{issue.relatedSection}</span> : null}
-                </div>
-                <h4>{issue.issue}</h4>
-                <p>{issue.whyItMatters}</p>
-                <div className="issue-revision-note">
-                  <Sparkles size={15} aria-hidden="true" />
-                  <span>{issue.suggestedRevision}</span>
-                </div>
-              </article>
-            ))}
+            {review.issues.length ? (
+              review.issues.map((issue) => (
+                <article className="critique-issue-card" key={issue.id}>
+                  <div className="critique-issue-topline">
+                    <span className={`priority-badge ${priorityTone(issue.priority)}`}>{issue.priority}</span>
+                    {issue.relatedSection ? <span className="issue-section-chip">{issue.relatedSection}</span> : null}
+                  </div>
+                  <h4>{issue.issue}</h4>
+                  <p>{issue.whyItMatters}</p>
+                  <div className="issue-revision-note">
+                    <Sparkles size={15} aria-hidden="true" />
+                    <span>{issue.suggestedRevision}</span>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p className="empty-plan-copy">This critic did not raise any actionable issues in the current pass.</p>
+            )}
           </div>
         </section>
       </div>

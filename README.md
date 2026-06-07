@@ -39,6 +39,19 @@ All deadlines use Pacific Time.
 
 This repository includes a small starter app to illustrate one possible proposal-agent workflow. It is optional: you may use it, replace it, or ignore it.
 
+Current Stage 2 refinement status:
+
+- Step 1 is now designed around a server-backed agent session instead of a browser-only template preview.
+- The app persists transcripts, provider labels, revised draft state, and proposal-output evidence so reloads can resume the workflow.
+- `STAGE2_PROGRESS.md` in the repo root is the running engineering log that can later be summarized into `workflow_usage.md` and `AI_USAGE.md`.
+
+Current submission files:
+
+- `workflow_usage.md`
+- `AI_USAGE.md`
+- `evidence/stage2-run-01/`
+- `proposal/`
+
 Example starter screens:
 
 ![Starter app workflow screen](docs/assets/starter-app-workflow.png)
@@ -57,6 +70,8 @@ Open:
 ```text
 http://127.0.0.1:5174
 ```
+
+The proposal pipeline requires an API-backed run. Copy `.env.example` to `.env` in the repo root and configure the Gemini provider before starting the server. If the API key is missing, quota is exhausted, or Gemini fails after retries, the app shows an error instead of generating template proposal content.
 
 We encourage students to start with the [Gemini API free tier](https://ai.google.dev/gemini-api/docs/pricing). If the free tier is not enough for your project, email the TA at <yfu093@ucr.edu> to request additional API access. Keep all API keys out of GitHub and document your setup.
 
@@ -118,6 +133,13 @@ Submit:
 - figure or diagram source if applicable.
 
 Details: [docs/stage_3_final_proposal.md](docs/stage_3_final_proposal.md)
+
+## Stage 2 And Stage 3 Files
+
+- [workflow_usage.md](workflow_usage.md)
+- [AI_USAGE.md](AI_USAGE.md)
+- [evidence/stage2-run-01/](evidence/stage2-run-01/)
+- [proposal/](proposal/)
 
 ## Required Proposal Requirements
 

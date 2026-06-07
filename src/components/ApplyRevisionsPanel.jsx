@@ -5,7 +5,6 @@ import VersionHistoryPanel from './VersionHistoryPanel.jsx';
 function ApplyRevisionsPanel({
   applyRevisionsError,
   applyRevisionsGeneratedAt,
-  applyRevisionsMode,
   applyRevisionsStatus,
   currentVersionId,
   draftComparisonVersions,
@@ -20,12 +19,12 @@ function ApplyRevisionsPanel({
   revisionApplicationStale,
   revisionPlan,
   selectedComparison,
+  sourceLabel,
   versionComparison
 }) {
   const acceptedCount = revisionPlan?.acceptedSuggestions?.length || 0;
   const hasVersions = proposalVersions.length > 0;
   const hasDraftComparison = Boolean(draftVersionComparison);
-  const modeLabel = applyRevisionsMode === 'api' ? 'Gemini' : applyRevisionsMode === 'template' ? 'Template' : 'Waiting';
   const latestPreviewVersion = draftComparisonVersions.at(-1) || null;
   const readyForNextStep =
     hasDraftComparison &&
@@ -43,7 +42,7 @@ function ApplyRevisionsPanel({
             This step applies only the suggestions you accepted and previews the before/after draft changes before Step 7 saves a new finalized version.
           </p>
         </div>
-        <span className={applyRevisionsMode ? 'mode-pill is-ready' : 'mode-pill'}>{modeLabel}</span>
+        <span className={sourceLabel !== 'Waiting' ? 'mode-pill is-ready' : 'mode-pill'}>{sourceLabel}</span>
       </div>
 
       <div className="action-row summary-actions">
