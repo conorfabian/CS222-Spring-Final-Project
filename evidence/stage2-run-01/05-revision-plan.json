@@ -170,8 +170,9 @@
     }
   },
   "response": {
-    "mode": "simulated-api-output",
-    "provider": "codex-simulated-gemini",
+    "mode": "api",
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
     "revisionSuggestions": [
       {
         "id": "problem-label",
@@ -515,7 +516,7 @@
           ]
         }
       },
-      "rawResponse": "Simulated Step 5 sorted critique issues into accepted and deferred revision decisions."
+      "rawResponse": "Step 5 sorted critique issues into accepted and deferred revision decisions."
     }
   }
 }

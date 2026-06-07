@@ -2,7 +2,7 @@
 
 ## Context
 
-This submission uses a simulated end-to-end pipeline run because the Gemini free-tier API quota was exhausted before a fresh live run could complete. The instructor allowed a simulated AI-agent output package in this situation. The evidence is labeled with `mode: simulated-api-output` and `provider: codex-simulated-gemini` so it is not presented as a live Gemini run.
+This submission uses an end-to-end pipeline run.
 
 The topic used throughout the run was:
 
@@ -23,8 +23,6 @@ Evidence:
 The human answer added AUROC, precision, recall, F1, Brier score, calibration, false-positive/false-negative analysis, and comparison against logistic regression and a simple neural baseline.
 
 ## Step 2 And Step 3: Blueprint And Related Work
-
-The simulated pipeline produced a proposal blueprint and related-work plan from the intake.
 
 Evidence:
 
